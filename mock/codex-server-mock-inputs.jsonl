@@ -9,3 +9,4 @@
 {"method":"thread/resume","id":11,"params":{"threadId":"thr_123","personality":"friendly"}}
 
 {"method":"account/login/start","id":2,"params":{"type":"chatgpt"}}
+{"method":"account/read","id":1,"params":{"refreshToken":false}}
