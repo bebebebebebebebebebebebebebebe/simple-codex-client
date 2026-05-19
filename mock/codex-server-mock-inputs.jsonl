@@ -7,3 +7,5 @@
 {"method":"thread/start","id":10,"params":{"model":"gpt-5.4"}}
 
 {"method":"thread/resume","id":11,"params":{"threadId":"thr_123","personality":"friendly"}}
+
+{"method":"account/login/start","id":2,"params":{"type":"chatgpt"}}
