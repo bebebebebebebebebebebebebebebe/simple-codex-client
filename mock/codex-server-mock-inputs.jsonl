@@ -1,0 +1,9 @@
+{"method":"initialize","id":0,"params":{"clientInfo":{"name":"my_client","title":"My Client","version":"0.1.0"}}}
+{"method":"initialized","params":{}}
+
+{"method":"model/list","id":6,"params":{"limit":20,"includeHidden":false}}
+
+{"method":"thread/list","id":14,"params":{"cursor":null,"limit":25,"sortKey":"created_at","archived":false}}
+{"method":"thread/start","id":10,"params":{"model":"gpt-5.4"}}
+
+{"method":"thread/resume","id":11,"params":{"threadId":"thr_123","personality":"friendly"}}

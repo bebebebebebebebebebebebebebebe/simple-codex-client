@@ -1,0 +1,75 @@
+{
+  "valid_sum_request": {
+    "id": 1,
+    "method": "sum",
+    "params": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "valid_sum_with_negative_and_decimal": {
+    "id": "req-001",
+    "method": "sum",
+    "params": [
+      10,
+      -2,
+      3.5
+    ]
+  },
+  "valid_sum_empty_array": {
+    "id": 2,
+    "method": "sum",
+    "params": []
+  },
+  "invalid_sum_params_string": {
+    "id": 3,
+    "method": "sum",
+    "params": "1,2,3"
+  },
+  "invalid_sum_params_object": {
+    "id": 4,
+    "method": "sum",
+    "params": {
+      "a": 1,
+      "b": 2
+    }
+  },
+  "unknown_method": {
+    "id": 5,
+    "method": "multiply",
+    "params": [
+      2,
+      3
+    ]
+  },
+  "invalid_request_missing_id": {
+    "method": "sum",
+    "params": [
+      1,
+      2,
+      3
+    ]
+  },
+  "invalid_request_missing_method": {
+    "id": 6,
+    "params": [
+      1,
+      2,
+      3
+    ]
+  },
+  "invalid_request_null": null,
+  "invalid_request_array": [],
+  "edge_case_mixed_type_array": {
+    "id": 7,
+    "method": "sum",
+    "params": [
+      1,
+      "2",
+      3
+    ]
+  }
+}
