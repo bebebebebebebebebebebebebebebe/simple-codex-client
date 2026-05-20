@@ -7,6 +7,11 @@
       "skillPath": "assistant-ui/skills/assistant-ui/SKILL.md",
       "computedHash": "cfce3ce8c4c2da38f0fc8e881af677efa8166d379862541f79c54e66f1a599d5"
     },
+    "bun": {
+      "source": "bun.sh",
+      "sourceType": "well-known",
+      "computedHash": "110f793dac734495035068667a682f84f9abf554824002d95c870ea5d9a555d3"
+    },
     "cloud": {
       "source": "assistant-ui/skills",
       "sourceType": "github",
