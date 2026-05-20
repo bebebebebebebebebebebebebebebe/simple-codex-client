@@ -82,11 +82,15 @@ export class JsonRpcMockServer {
             },
           };
         }
+      case "chat": {
+        const message = (params as { message?: string }).message ?? "";
+        return { id, result: { reply: `Echo: ${message}` }, method, params };
+      }
       default:
         return {
           id,
           error: {
-            message: `Method ${method} not found. Available methods: sum (expects an array of numbers as params)`,
+            message: `Method ${method} not found. Available methods: sum, chat`,
             data: request,
           },
         };

@@ -1,15 +1,12 @@
-import { useState } from "react";
+import { MyRuntimeProvider } from "./MyRuntimeProvider";
+import { Thread } from "@/components/assistant-ui/thread";
 
 export default function App() {
-  const [count, setCount] = useState(0);
-
   return (
-    <div>
-      <h1>Simple Codex Client</h1>
-      <p>Edit App.tsx and save to see HMR in action.</p>
-      <button onClick={() => setCount(c => c + 1)}>
-        Count: {count}
-      </button>
-    </div>
+    <MyRuntimeProvider>
+      <div className="h-screen">
+        <Thread />
+      </div>
+    </MyRuntimeProvider>
   );
 }
