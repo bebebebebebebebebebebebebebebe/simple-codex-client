@@ -32,9 +32,9 @@ function ChatRoute() {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <main className="flex min-h-0 flex-1 bg-muted/30 p-4 sm:p-6">
+      <main className="flex min-h-0 flex-1">
         <section
-          className="mx-auto h-[calc(100vh-7rem)] min-h-0 w-full max-w-4xl overflow-hidden rounded-lg border bg-background text-foreground shadow-sm"
+          className="mx-auto h-[calc(100vh-4em)] min-h-0 w-full overflow-hidden rounded-lg border bg-background text-foreground shadow-sm"
           aria-label="Assistant chat"
         >
           <Thread />
@@ -47,14 +47,11 @@ function ChatRoute() {
 function RootLayout() {
   return (
     <div className="grid min-h-screen grid-rows-[auto_1fr] bg-background text-foreground">
-      <header className="flex flex-col gap-3 border-b bg-background/95 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <header className="flex gap-3 border-b bg-background/95 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:flex-row sm:items-center justify-between sm:px-6">
         <div>
           <h1 className="text-lg font-semibold tracking-tight">
             Simple Codex Client
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Vite, TanStack Router, assistant-ui
-          </p>
         </div>
         <span className="w-fit rounded-md border bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
           Local runtime
