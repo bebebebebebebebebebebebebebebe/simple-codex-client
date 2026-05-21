@@ -4,6 +4,7 @@ import {
   type ChatModelAdapter,
 } from "@assistant-ui/react";
 import { Thread } from "@/components/assistant-ui/thread";
+import { Sidebar } from "@/components/chat/Sidebar";
 import {
   Outlet,
   RouterProvider,
@@ -11,6 +12,7 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
+import { useCallback, useState } from "react";
 
 const demoModel: ChatModelAdapter = {
   async *run({ messages, abortSignal }) {
@@ -29,12 +31,15 @@ const demoModel: ChatModelAdapter = {
 
 function ChatRoute() {
   const runtime = useLocalRuntime(demoModel);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <main className="flex min-h-0 flex-1">
+      <main className="flex min-h-0 flex-1 overflow-hidden">
+        <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
         <section
-          className="mx-auto h-[calc(100vh-4em)] min-h-0 w-full overflow-hidden rounded-lg border bg-background text-foreground shadow-sm"
+          className="flex-1 h-[calc(100vh-4em)] min-h-0 overflow-hidden rounded-lg border bg-background text-foreground shadow-sm"
           aria-label="Assistant chat"
         >
           <Thread />
