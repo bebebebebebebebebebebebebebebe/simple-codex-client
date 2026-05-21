@@ -36,11 +36,23 @@
       "skillPath": "assistant-ui/skills/setup/SKILL.md",
       "computedHash": "283c7cbc08cbc1a3b58307083f505a24fcc8b5e5621608d6e1fb88034b1afce0"
     },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "80a6226e78f6d1fe464214ae0ef449d49d8ffaa3e7704f011e9b418c678ad4d1"
+    },
     "streaming": {
       "source": "assistant-ui/skills",
       "sourceType": "github",
       "skillPath": "assistant-ui/skills/streaming/SKILL.md",
       "computedHash": "31a090f9360343967f1189559c2b24da7eeacbf5b1b1c503c57c98c71106e326"
+    },
+    "tailwindcss": {
+      "source": "hairyf/skills",
+      "sourceType": "github",
+      "skillPath": "skills/tailwindcss/SKILL.md",
+      "computedHash": "676d95536c3c4a64215535ff09128d6e8d5163eb3fc204ed2cfde61e87b5d892"
     },
     "thread-list": {
       "source": "assistant-ui/skills",

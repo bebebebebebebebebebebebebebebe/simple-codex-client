@@ -19,11 +19,13 @@ const demoModel: ChatModelAdapter = {
     const lastMessage = messages.at(-1);
     const textPart = lastMessage?.content.find((part) => part.type === "text");
     const input = textPart?.type === "text" ? textPart.text : "";
-    const response = `Received: ${input || "empty message"}`;
+    const response = `${input || "empty message"}`;
 
+    let accumulated = "";
     for (const word of response.split(" ")) {
       if (abortSignal.aborted) return;
-      yield { content: [{ type: "text", text: `${word} ` }] };
+      accumulated += word + " ";
+      yield { content: [{ type: "text", text: accumulated }] };
       await new Promise((resolve) => setTimeout(resolve, 60));
     }
   },
