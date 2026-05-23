@@ -8,6 +8,9 @@ import {
   type ProcessJsonlTransportOptions,
 } from "./transports/process-jsonl-transport";
 
+/**
+ * 起動する JSONL RPC server の種類。
+ */
 type ServerProcess =
   | {
       type: "json-rpc-mock-server";
@@ -24,6 +27,12 @@ type ServerProcess =
       env?: NodeJS.ProcessEnv;
     };
 
+/**
+ * server process 設定から child process JSONL transport を作る。
+ *
+ * @param serverProcess - 起動対象のサーバー種別と起動設定。
+ * @returns 対応する ProcessJsonlTransport。
+ */
 const createProcessJsonlTransport = (
   serverProcess: ServerProcess,
 ): ProcessJsonlTransport => {
@@ -54,9 +63,13 @@ const createProcessJsonlTransport = (
 };
 
 /**
- * Local inspection logging. This intentionally prints full RPC payloads because
- * the sample client is for protocol debugging; do not use this unchanged in
- * production with user prompts, file contents, command output, or repo paths.
+ * RPC connection の検証用ログを設定する。
+ *
+ * この sample client は protocol debugging 用なので payload 全体を出力する。
+ * user prompt、file content、command output、repo path を扱う production 環境では、
+ * このまま使わず redaction や size limit を入れる。
+ *
+ * @param connection - ログ listener を登録する connection。
  */
 const setupConnectionLogging = (connection: JsonRpcConnection): void => {
   connection.onMessage((message: RpcMessage) => {
@@ -79,6 +92,12 @@ const setupConnectionLogging = (connection: JsonRpcConnection): void => {
   });
 };
 
+/**
+ * サンプル CLI の entrypoint。
+ *
+ * Codex App Server を child process として起動し、自動 initialize 後に
+ * 標準入力から JSON-RPC message を手入力できる runtime を開始する。
+ */
 const main = async (): Promise<void> => {
   const transport = createProcessJsonlTransport({
     type: "codex-app-server",
@@ -131,6 +150,9 @@ const main = async (): Promise<void> => {
   manualInputRuntime.start();
 };
 
+/**
+ * switch の網羅性を実行時にも明示する helper。
+ */
 const assertNever = (value: never): never => {
   throw new Error(`Unsupported server process: ${safeStringify(value)}`);
 };

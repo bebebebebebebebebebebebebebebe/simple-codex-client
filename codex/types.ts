@@ -1,29 +1,47 @@
 import type { JsonValue } from "../rpc/types";
 
-// This file intentionally keeps only the small App Server type subset used by
-// the sample client. For complete version-specific bindings, regenerate with:
-// `codex app-server generate-ts --out ./schemas/codex-app-server`
+/**
+ * このファイルは sample client が直接使う Codex App Server 型だけを持つ。
+ *
+ * 完全な version-specific binding が必要な場合は、次を再生成して使う。
+ * `codex app-server generate-ts --out ./schemas/codex-app-server`
+ */
 
+/**
+ * 将来 field が追加されても受け取れる、JSON object 風の補助型。
+ */
 type JsonObjectLike = {
   [key: string]: JsonValue | undefined;
 };
 
+/**
+ * initialize 時にサーバーへ渡す client 識別情報。
+ */
 export type ClientInfo = {
   name: string;
   title: string;
   version: string;
 };
 
+/**
+ * initialize 時に client が宣言する capability。
+ */
 export type InitializeCapabilities = {
   experimentalApi: boolean;
   optOutNotificationMethods?: string[] | null;
 };
 
+/**
+ * Codex App Server の `initialize` request params。
+ */
 export type InitializeParams = {
   clientInfo: ClientInfo;
   capabilities: InitializeCapabilities | null;
 };
 
+/**
+ * Codex App Server の `initialize` response。
+ */
 export type InitializeResponse = {
   userAgent: string;
   codexHome: string;
@@ -31,6 +49,11 @@ export type InitializeResponse = {
   platformOs: string;
 };
 
+/**
+ * `thread/start` request params の sample client 用 subset。
+ *
+ * 完全な型ではなく、主要 field と JSON extension field を許容する。
+ */
 export type ThreadStartParams = JsonObjectLike & {
   model?: string | null;
   modelProvider?: string | null;
@@ -46,6 +69,9 @@ export type ThreadStartParams = JsonObjectLike & {
   ephemeral?: boolean | null;
 };
 
+/**
+ * `thread/start` response の sample client 用 subset。
+ */
 export type ThreadStartResponse = JsonObjectLike & {
   thread: JsonValue;
   model: string;
@@ -54,6 +80,9 @@ export type ThreadStartResponse = JsonObjectLike & {
   cwd: string;
 };
 
+/**
+ * `turn/start` request params の sample client 用 subset。
+ */
 export type TurnStartParams = JsonObjectLike & {
   threadId: string;
   input: JsonValue[];
@@ -68,10 +97,16 @@ export type TurnStartParams = JsonObjectLike & {
   outputSchema?: JsonValue;
 };
 
+/**
+ * `turn/start` response の sample client 用 subset。
+ */
 export type TurnStartResponse = JsonObjectLike & {
   turn: JsonValue;
 };
 
+/**
+ * command execution approval request へ返せる decision。
+ */
 export type CommandExecutionApprovalDecision =
   | "accept"
   | "acceptForSession"
@@ -88,12 +123,18 @@ export type CommandExecutionApprovalDecision =
       };
     };
 
+/**
+ * file change approval request へ返せる decision。
+ */
 export type FileChangeApprovalDecision =
   | "accept"
   | "acceptForSession"
   | "decline"
   | "cancel";
 
+/**
+ * command execution approval request params の sample client 用 subset。
+ */
 export type CommandExecutionRequestApprovalParams = JsonObjectLike & {
   threadId: string;
   turnId: string;
@@ -109,10 +150,16 @@ export type CommandExecutionRequestApprovalParams = JsonObjectLike & {
   proposedNetworkPolicyAmendments?: JsonValue[] | null;
 };
 
+/**
+ * command execution approval request への response。
+ */
 export type CommandExecutionRequestApprovalResponse = {
   decision: CommandExecutionApprovalDecision;
 };
 
+/**
+ * file change approval request params の sample client 用 subset。
+ */
 export type FileChangeRequestApprovalParams = JsonObjectLike & {
   threadId: string;
   turnId: string;
@@ -122,6 +169,9 @@ export type FileChangeRequestApprovalParams = JsonObjectLike & {
   grantRoot?: string | null;
 };
 
+/**
+ * file change approval request への response。
+ */
 export type FileChangeRequestApprovalResponse = {
   decision: FileChangeApprovalDecision;
 };
