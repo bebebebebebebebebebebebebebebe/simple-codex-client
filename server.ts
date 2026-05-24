@@ -1,13 +1,135 @@
 import index from "./index.html";
+import { codexWebSession } from "./codex/codex-session";
 
 const requestedPort = Number(Bun.env.PORT ?? 3000);
 
+/**
+ * Server-Sent Events の1イベント分を wire format 文字列へ変換する。
+ *
+ * @param event - SSE の event フィールドに設定するイベント名。
+ * @param data - JSON 文字列化して data フィールドに設定するペイロード。
+ * @returns SSE クライアントへ送信できる1イベント分の文字列。
+ */
+function sseEncode(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+/**
+ * API レスポンス用の JSON `Response` を生成する。
+ *
+ * @param data - JSON として返すレスポンス本文。
+ * @param init - HTTP ステータスやヘッダーなどの `Response` 初期化オプション。
+ * @returns `application/json` として扱われる Bun/Fetch API のレスポンス。
+ */
+function jsonResponse(data: unknown, init?: ResponseInit): Response {
+  return Response.json(data, init);
+}
+
+/**
+ * Web UI と Codex チャット API を提供する Bun サーバーを起動する。
+ *
+ * `/api/health`、SSE で応答する `/api/chat`、API 404 fallback を同じサーバーに登録する。
+ *
+ * @param port - Bun サーバーを listen する TCP ポート番号。
+ * @returns 起動済みの Bun サーバーインスタンス。
+ * @throws `Bun.serve` が listen に失敗した場合は、その例外をそのまま送出する。
+ */
 function startServer(port: number) {
   return Bun.serve({
     port,
+
     routes: {
       "/": index,
+
+      "/api/health": {
+        GET: () => {
+          return jsonResponse({ ok: true });
+        },
+      },
+
+      "/api/chat": {
+        POST: async (request, server) => {
+          const body = (await request.json().catch(() => null)) as {
+            message?: string;
+          } | null;
+
+          if (
+            !body ||
+            typeof body.message !== "string" ||
+            !body.message.trim()
+          ) {
+            return jsonResponse(
+              { error: "message is required" },
+              { status: 400 },
+            );
+          }
+
+          // SSEは長時間無通信になる可能性があるため、request単位でidle timeoutを無効化する
+          server.timeout(request, 0);
+
+          const stream = new ReadableStream<Uint8Array>({
+            async start(controller) {
+              const encoder = new TextEncoder();
+              const message = body.message;
+
+              if (typeof message !== "string" || message.length === 0) {
+                return jsonResponse(
+                  { error: "message is required" },
+                  { status: 400 },
+                );
+              }
+
+              try {
+                for await (const chunk of codexWebSession.runTurn(
+                  message,
+                )) {
+                  controller.enqueue(
+                    encoder.encode(sseEncode(chunk.type, chunk)),
+                  );
+
+                  if (chunk.type === "done" || chunk.type === "error") {
+                    break;
+                  }
+                }
+              } catch (error) {
+                controller.enqueue(
+                  encoder.encode(
+                    sseEncode("error", {
+                      type: "error",
+                      message:
+                        error instanceof Error ? error.message : String(error),
+                    }),
+                  ),
+                );
+              } finally {
+                controller.close();
+              }
+            },
+          });
+
+          return new Response(stream, {
+            headers: {
+              "content-type": "text/event-stream; charset=utf-8",
+              "cache-control": "no-cache",
+              connection: "keep-alive",
+            },
+          });
+        },
+      },
+
+      "/api/*": {
+        GET: () => jsonResponse({ message: "Not found" }, { status: 404 }),
+        POST: () => jsonResponse({ message: "Not found" }, { status: 404 }),
+        PUT: () => jsonResponse({ message: "Not found" }, { status: 404 }),
+        PATCH: () => jsonResponse({ message: "Not found" }, { status: 404 }),
+        DELETE: () => jsonResponse({ message: "Not found" }, { status: 404 }),
+      },
     },
+
+    fetch() {
+      return new Response("Not Found", { status: 404 });
+    },
+
     development: {
       hmr: true,
       console: true,
@@ -15,8 +137,16 @@ function startServer(port: number) {
   });
 }
 
+/**
+ * 例外がポート使用中を表す `EADDRINUSE` エラーかどうかを判定する。
+ *
+ * @param error - `Bun.serve` などから投げられた任意の例外値。
+ * @returns ポート衝突を示すエラーであれば `true`。
+ */
 function isPortInUseError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "EADDRINUSE";
+  return (
+    error instanceof Error && "code" in error && error.code === "EADDRINUSE"
+  );
 }
 
 const candidatePorts = Bun.env.PORT
@@ -31,10 +161,7 @@ for (const port of candidatePorts) {
     server = startServer(port);
     break;
   } catch (error) {
-    if (!isPortInUseError(error)) {
-      throw error;
-    }
-
+    if (!isPortInUseError(error)) throw error;
     lastError = error;
     console.warn(`Port ${port} is in use.`);
   }

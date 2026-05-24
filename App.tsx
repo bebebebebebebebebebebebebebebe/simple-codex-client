@@ -31,8 +31,94 @@ const demoModel: ChatModelAdapter = {
   },
 };
 
+const codexModel: ChatModelAdapter = {
+  async *run({ messages, abortSignal }) {
+    const lastMessage = messages.at(-1);
+    const textPart = lastMessage?.content.find((part) => part.type === "text");
+    const input = textPart?.type === "text" ? textPart.text : "";
+
+    if (!input) {
+      yield {
+        content: [{ type: "text", text: "入力が空です。" }],
+      };
+      return;
+    }
+
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ message: input }),
+      signal: abortSignal,
+    });
+
+    if (!response.ok || !response.body) {
+      yield {
+        content: [
+          {
+            type: "text",
+            text: `Codex API request failed: ${response.status}`,
+          },
+        ],
+      };
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    let buffer = "";
+    let accumulated = "";
+
+    while (true) {
+      if (abortSignal.aborted) return;
+
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
+
+      for (const eventText of events) {
+        const dataLine = eventText
+          .split("\n")
+          .find((line) => line.startsWith("data: "));
+
+        if (!dataLine) continue;
+
+        const payload = JSON.parse(dataLine.slice("data: ".length)) as
+          | { type: "delta"; text: string }
+          | { type: "done" }
+          | { type: "error"; message: string };
+
+        if (payload.type === "delta") {
+          accumulated += payload.text;
+
+          yield {
+            content: [{ type: "text", text: accumulated }],
+          };
+        }
+
+        if (payload.type === "error") {
+          yield {
+            content: [{ type: "text", text: payload.message }],
+          };
+          return;
+        }
+
+        if (payload.type === "done") {
+          return;
+        }
+      }
+    }
+  },
+};
+
 function ChatRoute() {
-  const runtime = useLocalRuntime(demoModel);
+  const runtime = useLocalRuntime(codexModel);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
 

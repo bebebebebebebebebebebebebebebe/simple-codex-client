@@ -18,6 +18,12 @@
       "skillPath": "assistant-ui/skills/cloud/SKILL.md",
       "computedHash": "cf6312de5be25e06c83c5a7012499686f6f2bb542594087c681cc67f9902b30c"
     },
+    "crafting-effective-readmes": {
+      "source": "softaworks/agent-toolkit",
+      "sourceType": "github",
+      "skillPath": "skills/crafting-effective-readmes/SKILL.md",
+      "computedHash": "c931a8c22160e8925400778fcb2266b5d1df762f3052edba65f72479f79f2d6c"
+    },
     "mermaid-diagrams": {
       "source": "softaworks/agent-toolkit",
       "sourceType": "github",
