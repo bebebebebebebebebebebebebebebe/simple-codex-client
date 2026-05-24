@@ -30,33 +30,38 @@ Bun で動く Codex App Server / JSON-RPC JSONL 検証クライアントです�
 全体構成は、CLI と Web UI の 2 つの入口があり、どちらも `JsonRpcConnection` と `ProcessJsonlTransport` を通じて `codex app-server` と stdio JSONL で通信する形です。
 
 ```mermaid
-flowchart LR
-    CliUser[標準入力ユーザー] --> CliEntry[json-rpc-stdio-client.ts]
-    WebUser[ブラウザユーザー] --> WebApp[App.tsx]
+flowchart TD
+    CliUser[標準入力ユーザー]
+    WebUser[ブラウザユーザー]
 
-    subgraph CLI[CLI manual JSON-RPC]
-        CliEntry --> Manual[cli/ ManualJsonInputRuntime]
-        CliEntry --> CliClient[codex/ CodexAppServerClient]
-        CliEntry --> Approval[codex/ approval handlers]
-        Manual -->|id 付き request| CliConnection[rpc/ JsonRpcConnection]
-        Manual -->|notification / response| CliConnection
-        CliClient -->|initialize / typed request| CliConnection
+    subgraph Entry[Entrypoints]
+        CliUser --> CliEntry[json-rpc-stdio-client.ts]
+        WebUser --> WebApp[App.tsx]
+    end
+
+    subgraph AppLayer[Application layer]
+        CliEntry --> Manual[ManualJsonInputRuntime]
+        CliEntry --> CliClient[CodexAppServerClient]
+        CliEntry --> Approval[approval handlers]
+
+        WebApp -->|POST /api/chat| ApiServer[server.ts]
+        ApiServer -->|runTurn| WebSession[CodexWebSession]
+        WebSession --> WebClient[CodexAppServerClient]
+    end
+
+    subgraph RpcLayer[JSON-RPC / JSONL layer]
+        Manual -->|requestRaw / sendRaw| CliConnection[JsonRpcConnection]
+        CliClient -->|initialize / requests| CliConnection
         Approval -->|server request handler| CliConnection
+        WebClient -->|thread / turn requests| WebConnection[JsonRpcConnection]
+
+        CliConnection --> CliTransport[ProcessJsonlTransport]
+        WebConnection --> WebTransport[ProcessJsonlTransport]
+        CliTransport <-->|stdio JSONL| CodexServer[codex app-server]
+        WebTransport <-->|stdio JSONL| CodexServer
     end
 
-    subgraph Web[Web UI chat]
-        WebApp -->|POST /api/chat| ApiChat[server.ts /api/chat]
-        ApiChat -->|runTurn| WebSession[codex/ CodexWebSession]
-        WebSession --> WebClient[codex/ CodexAppServerClient]
-        WebClient --> WebConnection[rpc/ JsonRpcConnection]
-    end
-
-    CliConnection -->|JSON-RPC message| CliTransport[transports/ ProcessJsonlTransport]
-    WebConnection -->|JSON-RPC message| WebTransport[transports/ ProcessJsonlTransport]
-    CliTransport <-->|stdio JSONL| CodexServer[codex app-server]
-    WebTransport <-->|stdio JSONL| CodexServer
-
-    Mock[mock/ JSON-RPC mock server] -. 検証用 .-> CliTransport
+    Mock[mock JSON-RPC server] -. 検証用 .-> CliTransport
 ```
 
 CLI で手動入力した id 付き request は `requestRaw()` で pending 管理され、同じ id の response が返ると結果として解決されます。
