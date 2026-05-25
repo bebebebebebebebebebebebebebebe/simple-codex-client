@@ -31,6 +31,10 @@ test("hello world", () => {
 });
 ```
 
+## Development Servers
+
+検証やテストのために `bun run dev`、`bun run server`、`bun run webui` などの開発用サーバーを起動した場合は、確認後に必ず該当プロセスを終了する。バックグラウンドに開発用サーバーを残さない。
+
 ## Frontend
 
 Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.

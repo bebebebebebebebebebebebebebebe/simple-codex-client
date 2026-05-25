@@ -10,6 +10,11 @@
 - Use `bun install` instead of npm/yarn/pnpm installs.
 - Bun automatically loads `.env`; do not add `dotenv`.
 
+## Development Servers
+
+- If an AI agent starts a development server for verification or testing, it must stop that process after use.
+- Do not leave development servers such as `bun run dev`, `bun run server`, or `bun run webui` running in the background once the check is complete.
+
 ## Documentation Comments
 
 - When adding or changing implementation code, write JSDoc/TSDoc comments for public classes, functions, types, and interfaces so their responsibility, inputs, return values, and important failure modes are clear.
