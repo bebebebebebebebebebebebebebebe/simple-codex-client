@@ -1,5 +1,20 @@
 import { registerDefaultServerRequestHandlers } from "./approvals";
 import { CodexAppServerClient } from "./client";
+import {
+  asString,
+  isRecord,
+  normalizeAgentMessageDelta,
+  normalizeCommandOutputDelta,
+  normalizeDiffUpdated,
+  normalizeError,
+  normalizeItemCompleted,
+  normalizeItemStarted,
+  normalizePlanUpdated,
+  normalizeReasoningPartAdded,
+  normalizeReasoningSummaryDelta,
+  normalizeTurnCompleted,
+} from "./notification-normalizer";
+import type { CodexUiEvent } from "./ui-events";
 import { JsonRpcConnection } from "../rpc/connection";
 import { ProcessJsonlTransport } from "../transports/process-jsonl-transport";
 import type { JsonValue } from "../rpc/types";
@@ -31,16 +46,6 @@ const setupConnectionLogging = (connection: JsonRpcConnection): void => {
     });
   });
 };
-
-/**
- * Web UI へ SSE として渡すチャット進行イベントを表す。
- *
- * `delta` は生成途中のテキスト、`done` は正常完了、`error` はターン失敗を示す。
- */
-type ChatChunk =
-  | { type: "delta"; text: string }
-  | { type: "done" }
-  | { type: "error"; message: string };
 
 /**
  * push 型の通知コールバックを `AsyncIterable` として読み出せるようにする内部キュー。
@@ -107,7 +112,7 @@ class AsyncQueue<T> {
 /**
  * Web UI から Codex app-server のスレッドとターンを扱うためのセッション管理クラス。
  *
- * 接続の遅延初期化、スレッド再利用、ターン通知の `ChatChunk` 化をまとめて扱う。
+ * 接続の遅延初期化、スレッド再利用、ターン通知の `CodexUiEvent` 化をまとめて扱う。
  */
 export class CodexWebSession {
   private client: CodexAppServerClient | null = null;
@@ -154,15 +159,15 @@ export class CodexWebSession {
   }
 
   /**
-   * Codex スレッドへユーザー入力を送信し、ターンの進行を `ChatChunk` として順次返す。
+   * Codex スレッドへユーザー入力を送信し、ターンの進行を `CodexUiEvent` として順次返す。
    *
    * 初回呼び出しではスレッドを作成し、以後は同じスレッド ID を再利用する。通知購読で受けた
-   * `delta`、`done`、`error` を yield し、終了時には購読解除とキューの close を必ず行う。
+   * reasoning、tool、message、turn 完了 event を yield し、終了時には購読解除とキューの close を必ず行う。
    *
    * @param inputText - Codex へ送信するユーザー入力テキスト。
    * @returns Web UI が SSE として送信できるチャット進行イベントの async iterable。
    */
-  async *runTurn(inputText: string): AsyncIterable<ChatChunk> {
+  async *runTurn(inputText: string): AsyncIterable<CodexUiEvent> {
     await this.start();
 
     const client = this.client;
@@ -188,47 +193,118 @@ export class CodexWebSession {
       this.threadId = thread.id;
     }
 
-    const queue = new AsyncQueue<ChatChunk>();
+    const queue = new AsyncQueue<CodexUiEvent>();
+    const unsubscribers: Array<() => void> = [];
+    const agentMessagePhases = new Map<
+      string,
+      "commentary" | "final_answer"
+    >();
 
-    const unsubscribeDelta = client.onNotification(
-      "item/agentMessage/delta",
-      (params) => {
-        const payload = params as { delta?: string; text?: string };
-        const text = payload.delta ?? payload.text ?? "";
-        if (text) {
-          queue.push({ type: "delta", text });
+    const pushIfEvent = (event: CodexUiEvent | null): void => {
+      if (event) queue.push(event);
+    };
+
+    unsubscribers.push(
+      client.onNotification("item/agentMessage/delta", (params) => {
+        const itemId = isRecord(params) ? asString(params["itemId"]) : undefined;
+        pushIfEvent(
+          normalizeAgentMessageDelta(
+            params,
+            itemId ? agentMessagePhases.get(itemId) : undefined,
+          ),
+        );
+      }),
+    );
+    unsubscribers.push(
+      client.onNotification("item/reasoning/summaryTextDelta", (params) => {
+        pushIfEvent(normalizeReasoningSummaryDelta(params));
+      }),
+    );
+    unsubscribers.push(
+      client.onNotification("item/reasoning/summaryPartAdded", (params) => {
+        pushIfEvent(normalizeReasoningPartAdded(params));
+      }),
+    );
+    unsubscribers.push(
+      client.onNotification("item/commandExecution/outputDelta", (params) => {
+        pushIfEvent(normalizeCommandOutputDelta(params));
+      }),
+    );
+    unsubscribers.push(
+      client.onNotification("turn/plan/updated", (params) => {
+        pushIfEvent(normalizePlanUpdated(params));
+      }),
+    );
+    unsubscribers.push(
+      client.onNotification("turn/diff/updated", (params) => {
+        pushIfEvent(normalizeDiffUpdated(params));
+      }),
+    );
+    unsubscribers.push(
+      client.onNotification("item/started", (params) => {
+        const item = isRecord(params) ? params["item"] : undefined;
+        if (isRecord(item)) {
+          const itemId = asString(item["id"]);
+          const phase = item["phase"];
+          if (
+            itemId &&
+            item["type"] === "agentMessage" &&
+            (phase === "commentary" || phase === "final_answer")
+          ) {
+            agentMessagePhases.set(itemId, phase);
+          }
         }
-      },
+
+        pushIfEvent(normalizeItemStarted(params));
+      }),
+    );
+    unsubscribers.push(
+      client.onNotification("item/completed", (params) => {
+        const item = isRecord(params) ? params["item"] : undefined;
+        const itemId = isRecord(item) ? asString(item["id"]) : undefined;
+        pushIfEvent(normalizeItemCompleted(params));
+        if (itemId && isRecord(item) && item["type"] === "agentMessage") {
+          agentMessagePhases.delete(itemId);
+        }
+      }),
+    );
+    unsubscribers.push(
+      client.onNotification("turn/completed", (params) => {
+        queue.push(normalizeTurnCompleted(params));
+        queue.close();
+      }),
+    );
+    unsubscribers.push(
+      client.onNotification("error", (params) => {
+        queue.push(normalizeError(params));
+        queue.close();
+      }),
     );
 
-    const unsubscribeCompleted = client.onNotification("turn/completed", () => {
-      queue.push({ type: "done" });
-      queue.close();
-    });
-
-    const unsubscribeError = client.onNotification("error", (params) => {
-      const payload = params as { error?: { message?: string } };
-      queue.push({
-        type: "error",
-        message: payload.error?.message ?? "Codex turn failed",
-      });
-      queue.close();
-    });
-
     try {
-      await client.startTurn({
+      const turnResult = await client.startTurn({
         threadId: this.threadId,
         input: [{ type: "text", text: inputText }] as JsonValue[],
       });
 
-      for await (const chunk of queue) {
-        yield chunk;
-        if (chunk.type === "done" || chunk.type === "error") break;
+      const turn = isRecord(turnResult.turn) ? turnResult.turn : undefined;
+      const turnId = asString(turn?.["id"]);
+      if (turnId) {
+        queue.push({
+          type: "turn.started",
+          threadId: this.threadId,
+          turnId,
+        });
+      }
+
+      for await (const event of queue) {
+        yield event;
+        if (event.type === "turn.completed" || event.type === "error") break;
       }
     } finally {
-      unsubscribeDelta();
-      unsubscribeCompleted();
-      unsubscribeError();
+      for (const unsubscribe of unsubscribers) {
+        unsubscribe();
+      }
       queue.close();
     }
   }

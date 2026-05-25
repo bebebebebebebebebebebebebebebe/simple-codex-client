@@ -80,14 +80,17 @@ function startServer(port: number) {
               }
 
               try {
-                for await (const chunk of codexWebSession.runTurn(
+                for await (const event of codexWebSession.runTurn(
                   message,
                 )) {
                   controller.enqueue(
-                    encoder.encode(sseEncode(chunk.type, chunk)),
+                    encoder.encode(sseEncode(event.type, event)),
                   );
 
-                  if (chunk.type === "done" || chunk.type === "error") {
+                  if (
+                    event.type === "turn.completed" ||
+                    event.type === "error"
+                  ) {
                     break;
                   }
                 }

@@ -5,6 +5,10 @@ import {
 } from "@assistant-ui/react";
 import { Thread } from "@/components/assistant-ui/thread";
 import { Sidebar } from "@/components/chat/Sidebar";
+import { parseCodexSseChunk } from "@/frontend/codex-sse-parser";
+import { applyCodexUiEvent } from "@/frontend/codex-turn-reducer";
+import { createInitialCodexTurnState } from "@/frontend/codex-turn-state";
+import { toAssistantRunResult } from "@/frontend/to-assistant-parts";
 import {
   Outlet,
   RouterProvider,
@@ -69,47 +73,40 @@ const codexModel: ChatModelAdapter = {
     const decoder = new TextDecoder();
 
     let buffer = "";
-    let accumulated = "";
+    let state = createInitialCodexTurnState();
 
     while (true) {
       if (abortSignal.aborted) return;
 
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) {
+        if (buffer) {
+          const parsed = parseCodexSseChunk(buffer, "\n\n");
+          buffer = parsed.buffer;
 
-      buffer += decoder.decode(value, { stream: true });
+          for (const payload of parsed.events) {
+            state = applyCodexUiEvent(state, payload);
+            yield toAssistantRunResult(state);
 
-      const events = buffer.split("\n\n");
-      buffer = events.pop() ?? "";
-
-      for (const eventText of events) {
-        const dataLine = eventText
-          .split("\n")
-          .find((line) => line.startsWith("data: "));
-
-        if (!dataLine) continue;
-
-        const payload = JSON.parse(dataLine.slice("data: ".length)) as
-          | { type: "delta"; text: string }
-          | { type: "done" }
-          | { type: "error"; message: string };
-
-        if (payload.type === "delta") {
-          accumulated += payload.text;
-
-          yield {
-            content: [{ type: "text", text: accumulated }],
-          };
+            if (payload.type === "turn.completed" || payload.type === "error") {
+              return;
+            }
+          }
         }
+        break;
+      }
 
-        if (payload.type === "error") {
-          yield {
-            content: [{ type: "text", text: payload.message }],
-          };
-          return;
-        }
+      const parsed = parseCodexSseChunk(
+        buffer,
+        decoder.decode(value, { stream: true }),
+      );
+      buffer = parsed.buffer;
 
-        if (payload.type === "done") {
+      for (const payload of parsed.events) {
+        state = applyCodexUiEvent(state, payload);
+        yield toAssistantRunResult(state);
+
+        if (payload.type === "turn.completed" || payload.type === "error") {
           return;
         }
       }
