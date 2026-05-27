@@ -1,5 +1,8 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import { registerDefaultServerRequestHandlers } from "./approvals";
+import {
+  onCommandApprovalRequest,
+  registerDefaultServerRequestHandlers,
+} from "./approvals";
 import { JsonRpcConnection } from "../rpc/connection";
 import type {
   JsonRpcTransport,
@@ -38,6 +41,37 @@ class FakeTransport implements JsonRpcTransport {
 }
 
 describe("Codex approval handlers", () => {
+  test("command approval handler receives request context", async () => {
+    const transport = new FakeTransport();
+    const connection = new JsonRpcConnection(transport);
+    const contexts: unknown[] = [];
+
+    onCommandApprovalRequest(connection, async (_params, context) => {
+      contexts.push(context);
+
+      return {
+        decision: "decline",
+      };
+    });
+
+    await connection.start();
+
+    transport.emitMessage({
+      id: "approval-1",
+      method: "item/commandExecution/requestApproval",
+      params: {},
+    });
+
+    await sleep(10);
+
+    expect(contexts).toEqual([
+      {
+        id: "approval-1",
+        method: "item/commandExecution/requestApproval",
+      },
+    ]);
+  });
+
   test("default command and file approval handlers decline", async () => {
     const consoleError = spyOn(console, "error").mockImplementation(() => {});
     const transport = new FakeTransport();

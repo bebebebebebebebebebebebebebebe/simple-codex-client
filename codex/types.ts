@@ -146,6 +146,7 @@ export type CommandExecutionRequestApprovalParams = JsonObjectLike & {
   cwd?: string | null;
   commandActions?: JsonValue[] | null;
   networkApprovalContext?: JsonValue;
+  availableDecisions?: string[] | null;
   proposedExecpolicyAmendment?: JsonValue;
   proposedNetworkPolicyAmendments?: JsonValue[] | null;
 };

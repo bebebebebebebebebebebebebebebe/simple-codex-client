@@ -1,5 +1,10 @@
 import type { CodexUiEvent } from "../codex/ui-events";
-import type { CodexTurnState, ReasoningState, ToolState } from "./codex-turn-state";
+import type {
+  ApprovalState,
+  CodexTurnState,
+  ReasoningState,
+  ToolState,
+} from "./codex-turn-state";
 
 const PLAN_STATUS_MARKER = {
   pending: "[ ]",
@@ -24,6 +29,23 @@ const createToolState = (
   output: "",
   status: "running",
 });
+
+const updateApprovalStatusByItemId = (
+  approvals: Record<string, ApprovalState>,
+  itemId: string,
+  status: ApprovalState["status"],
+): Record<string, ApprovalState> => {
+  let changed = false;
+  const next = Object.fromEntries(
+    Object.entries(approvals).map(([approvalRequestId, approval]) => {
+      if (approval.itemId !== itemId) return [approvalRequestId, approval];
+      changed = true;
+      return [approvalRequestId, { ...approval, status }];
+    }),
+  );
+
+  return changed ? next : approvals;
+};
 
 /**
  * tool argument を ToolFallback が表示しやすい文字列へ変換する。
@@ -170,10 +192,19 @@ export function applyCodexUiEvent(
       const current =
         state.toolItems[event.itemId] ??
         createToolState(event.itemId, event.toolType ?? "unknown", event.toolType);
+      const approvalItems =
+        event.status === "declined"
+          ? updateApprovalStatusByItemId(
+              state.approvalItems,
+              event.itemId,
+              "mock-declined",
+            )
+          : state.approvalItems;
 
       return {
         ...state,
         turnId: state.turnId ?? event.turnId,
+        approvalItems,
         toolItems: {
           ...state.toolItems,
           [event.itemId]: {
@@ -187,6 +218,43 @@ export function applyCodexUiEvent(
                 : event.status === "requires-action"
                   ? "requires-action"
                   : "incomplete",
+          },
+        },
+      };
+    }
+
+    case "approval.requested": {
+      const current =
+        state.toolItems[event.itemId] ??
+        createToolState(event.itemId, event.approvalType, event.requestMethod);
+
+      return {
+        ...state,
+        turnId: state.turnId ?? event.turnId,
+        approvalItems: {
+          ...state.approvalItems,
+          [event.approvalRequestId]: {
+            approvalRequestId: event.approvalRequestId,
+            approvalType: event.approvalType,
+            threadId: event.threadId,
+            turnId: event.turnId,
+            itemId: event.itemId,
+            requestMethod: event.requestMethod,
+            reason: event.reason,
+            command: event.command,
+            cwd: event.cwd,
+            grantRoot: event.grantRoot,
+            networkApprovalContext: event.networkApprovalContext,
+            availableDecisions: event.availableDecisions,
+            requestedAtMs: event.requestedAtMs,
+            status: event.status,
+          },
+        },
+        toolItems: {
+          ...state.toolItems,
+          [event.itemId]: {
+            ...current,
+            status: "requires-action",
           },
         },
       };

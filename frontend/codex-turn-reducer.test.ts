@@ -165,6 +165,98 @@ describe("Codex turn reducer", () => {
     });
   });
 
+  test("approval requested event is stored in turn state", () => {
+    let state = createInitialCodexTurnState();
+
+    state = applyCodexUiEvent(state, {
+      type: "approval.requested",
+      approvalRequestId: "approval-1",
+      approvalType: "commandExecution",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      requestMethod: "item/commandExecution/requestApproval",
+      reason: "needs command approval",
+      command: "bun test",
+      cwd: "/tmp/project",
+      status: "requires-action",
+    });
+
+    expect(state.approvalItems["approval-1"]).toMatchObject({
+      approvalType: "commandExecution",
+      command: "bun test",
+      status: "requires-action",
+    });
+    expect(state.toolItems["tool-1"]).toMatchObject({
+      status: "requires-action",
+    });
+  });
+
+  test("approval requested event is projected before normal tools", () => {
+    let state = createInitialCodexTurnState();
+
+    state = applyCodexUiEvent(state, {
+      type: "approval.requested",
+      approvalRequestId: "approval-1",
+      approvalType: "commandExecution",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      requestMethod: "item/commandExecution/requestApproval",
+      command: "bun test",
+      cwd: "/tmp/project",
+      status: "requires-action",
+    });
+    state = applyCodexUiEvent(state, {
+      type: "tool.started",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      toolType: "commandExecution",
+      name: "shell",
+      args: "bun test",
+    });
+
+    const result = toAssistantRunResult(state);
+
+    expect(result.content?.[0]).toMatchObject({
+      type: "tool-call",
+      toolCallId: "approval-1",
+      toolName: CODEX_PART_TOOL_NAMES.approval,
+      result: expect.objectContaining({
+        approvalRequestId: "approval-1",
+        command: "bun test",
+      }),
+    });
+    expect(result.content?.[1]).toMatchObject({
+      type: "tool-call",
+      toolName: "shell",
+    });
+  });
+
+  test("declined tool completion marks matching approval as mock declined", () => {
+    let state = createInitialCodexTurnState();
+
+    state = applyCodexUiEvent(state, {
+      type: "approval.requested",
+      approvalRequestId: "approval-1",
+      approvalType: "commandExecution",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      requestMethod: "item/commandExecution/requestApproval",
+      status: "requires-action",
+    });
+    state = applyCodexUiEvent(state, {
+      type: "tool.completed",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      toolType: "commandExecution",
+      status: "declined",
+    });
+
+    expect(state.approvalItems["approval-1"]?.status).toBe("mock-declined");
+  });
+
   test("final answer is projected as a normal text part", () => {
     let state = createInitialCodexTurnState();
 

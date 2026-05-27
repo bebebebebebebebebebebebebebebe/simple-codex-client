@@ -3,6 +3,7 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
+import { ApprovalCard } from "@/components/codex-ui/approval-card";
 import { DiffSummaryCard } from "@/components/codex-ui/diff-summary-card";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { PlanCard } from "@/components/codex-ui/plan-card";
@@ -26,6 +27,7 @@ import {
   CODEX_PART_TOOL_NAMES,
   CODEX_REASONING_PREFIXES,
 } from "@/frontend/codex-part-names";
+import type { ApprovalState } from "@/frontend/codex-turn-state";
 import { cn } from "@/lib/utils";
 import {
   ActionBarMorePrimitive,
@@ -257,6 +259,9 @@ const AssistantMessage: FC = () => {
             }
             if (part.type === "tool-call") {
               if (getMcpAppFromToolPart(part)) return null;
+              if (part.toolName === CODEX_PART_TOOL_NAMES.approval) {
+                return ["group-approval"];
+              }
               if (part.toolName === CODEX_PART_TOOL_NAMES.plan) {
                 return ["group-progress", "group-plan"];
               }
@@ -304,6 +309,8 @@ const AssistantMessage: FC = () => {
                 return <div data-slot="aui_codex-plan">{children}</div>;
               case "group-diff":
                 return <div data-slot="aui_codex-diff">{children}</div>;
+              case "group-approval":
+                return <div data-slot="aui_codex-approval">{children}</div>;
               case "group-tools":
                 return (
                   <ToolGroupRoot>
@@ -319,6 +326,11 @@ const AssistantMessage: FC = () => {
               case "reasoning":
                 return <Reasoning {...part} />;
               case "tool-call":
+                if (part.toolName === CODEX_PART_TOOL_NAMES.approval) {
+                  return (
+                    <ApprovalCard approval={part.result as ApprovalState} />
+                  );
+                }
                 if (part.toolName === CODEX_PART_TOOL_NAMES.plan) {
                   return <PlanCard text={String(part.result ?? "")} />;
                 }

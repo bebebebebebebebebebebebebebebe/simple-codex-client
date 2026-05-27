@@ -7,7 +7,7 @@ import {
   CODEX_PART_TOOL_NAMES,
   CODEX_REASONING_PREFIXES,
 } from "./codex-part-names";
-import type { CodexTurnState, ToolState } from "./codex-turn-state";
+import type { ApprovalState, CodexTurnState, ToolState } from "./codex-turn-state";
 
 const createMessageStatus = (state: CodexTurnState): MessageStatus => {
   const error =
@@ -50,6 +50,19 @@ const toToolPart = (tool: ToolState): ThreadAssistantMessagePart => {
   } as ThreadAssistantMessagePart;
 };
 
+const toApprovalPart = (
+  approval: ApprovalState,
+): ThreadAssistantMessagePart => {
+  return {
+    type: "tool-call",
+    toolCallId: approval.approvalRequestId,
+    toolName: CODEX_PART_TOOL_NAMES.approval,
+    args: approval,
+    argsText: "",
+    result: approval,
+  } as ThreadAssistantMessagePart;
+};
+
 /**
  * Codex turn 表示状態から assistant-ui が受け取る run result を作る。
  *
@@ -87,6 +100,10 @@ export function toAssistantRunResult(
       type: "reasoning",
       text: `${CODEX_REASONING_PREFIXES.commentary}${state.commentaryText}`,
     });
+  }
+
+  for (const approval of Object.values(state.approvalItems)) {
+    content.push(toApprovalPart(approval));
   }
 
   for (const tool of Object.values(state.toolItems)) {

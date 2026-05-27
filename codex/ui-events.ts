@@ -16,6 +16,20 @@ export type ToolUiStatus =
   | "unknown";
 
 /**
+ * Codex の approval request を Web UI で表示するときの種別。
+ */
+export type ApprovalUiType = "commandExecution" | "fileChange" | "network";
+
+/**
+ * Codex の approval request を Web UI で表示するときの状態。
+ */
+export type ApprovalUiStatus =
+  | "requires-action"
+  | "mock-declined"
+  | "resolved"
+  | "expired";
+
+/**
  * Codex App Server の notification を Web UI 表示用に正規化したイベント。
  *
  * SSE の `event:` 名と `data.type` の両方でこの `type` を使う。
@@ -101,6 +115,23 @@ export type CodexUiEvent =
       threadId?: string;
       turnId: string;
       diff: string;
+    }
+  | {
+      type: "approval.requested";
+      approvalRequestId: string;
+      approvalType: ApprovalUiType;
+      threadId: string;
+      turnId: string;
+      itemId: string;
+      requestMethod: string;
+      reason?: string | null;
+      command?: string | null;
+      cwd?: string | null;
+      grantRoot?: string | null;
+      networkApprovalContext?: unknown;
+      availableDecisions?: string[];
+      requestedAtMs?: number;
+      status: ApprovalUiStatus;
     }
   | {
       type: "turn.completed";

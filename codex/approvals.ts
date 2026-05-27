@@ -1,5 +1,5 @@
 import { JsonRpcConnection } from "../rpc/connection";
-import { assertJsonValue, type JsonValue } from "../rpc/types";
+import { assertJsonValue, type JsonValue, type RpcRequestId } from "../rpc/types";
 import type {
   CommandExecutionRequestApprovalParams,
   CommandExecutionRequestApprovalResponse,
@@ -8,10 +8,19 @@ import type {
 } from "./types";
 
 /**
+ * Codex App Server から届いた server initiated approval request の文脈。
+ */
+export type ApprovalRequestContext = {
+  id: RpcRequestId;
+  method: string;
+};
+
+/**
  * command execution approval request に応答する handler。
  */
 export type CommandApprovalHandler = (
   params: CommandExecutionRequestApprovalParams,
+  context: ApprovalRequestContext,
 ) =>
   | CommandExecutionRequestApprovalResponse
   | Promise<CommandExecutionRequestApprovalResponse>;
@@ -21,6 +30,7 @@ export type CommandApprovalHandler = (
  */
 export type FileChangeApprovalHandler = (
   params: FileChangeRequestApprovalParams,
+  context: ApprovalRequestContext,
 ) =>
   | FileChangeRequestApprovalResponse
   | Promise<FileChangeRequestApprovalResponse>;
@@ -38,9 +48,10 @@ export const onCommandApprovalRequest = (
 ): (() => void) => {
   return connection.onRequest(
     "item/commandExecution/requestApproval",
-    async (params) => {
+    async (params, context) => {
       const result = await handler(
         params as CommandExecutionRequestApprovalParams,
+        context,
       );
       return asJsonValue(result);
     },
@@ -58,10 +69,16 @@ export const onFileChangeApprovalRequest = (
   connection: JsonRpcConnection,
   handler: FileChangeApprovalHandler,
 ): (() => void) => {
-  return connection.onRequest("item/fileChange/requestApproval", async (params) => {
-    const result = await handler(params as FileChangeRequestApprovalParams);
-    return asJsonValue(result);
-  });
+  return connection.onRequest(
+    "item/fileChange/requestApproval",
+    async (params, context) => {
+      const result = await handler(
+        params as FileChangeRequestApprovalParams,
+        context,
+      );
+      return asJsonValue(result);
+    },
+  );
 };
 
 /**

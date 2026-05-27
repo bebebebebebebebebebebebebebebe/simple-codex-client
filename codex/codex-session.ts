@@ -1,4 +1,3 @@
-import { registerDefaultServerRequestHandlers } from "./approvals";
 import { CodexAppServerClient } from "./client";
 import {
   asString,
@@ -15,6 +14,10 @@ import {
   normalizeTurnCompleted,
 } from "./notification-normalizer";
 import type { CodexUiEvent } from "./ui-events";
+import {
+  registerWebApprovalRequestHandlers,
+  type ApprovalEventSink,
+} from "./web-approval-handlers";
 import { JsonRpcConnection } from "../rpc/connection";
 import { ProcessJsonlTransport } from "../transports/process-jsonl-transport";
 import type { JsonValue } from "../rpc/types";
@@ -119,6 +122,7 @@ export class CodexWebSession {
   private connection: JsonRpcConnection | null = null;
   private started = false;
   private threadId: string | null = null;
+  private activeApprovalSink: ApprovalEventSink | null = null;
 
   /**
    * Codex app-server プロセスを起動し、JSON-RPC クライアントを初期化する。
@@ -149,7 +153,9 @@ export class CodexWebSession {
     });
 
     setupConnectionLogging(connection);
-    registerDefaultServerRequestHandlers(connection);
+    registerWebApprovalRequestHandlers(connection, (event) => {
+      this.activeApprovalSink?.(event);
+    });
 
     await client.start();
 
@@ -202,6 +208,10 @@ export class CodexWebSession {
 
     const pushIfEvent = (event: CodexUiEvent | null): void => {
       if (event) queue.push(event);
+    };
+
+    this.activeApprovalSink = (event) => {
+      queue.push(event);
     };
 
     unsubscribers.push(
@@ -302,6 +312,7 @@ export class CodexWebSession {
         if (event.type === "turn.completed" || event.type === "error") break;
       }
     } finally {
+      this.activeApprovalSink = null;
       for (const unsubscribe of unsubscribers) {
         unsubscribe();
       }

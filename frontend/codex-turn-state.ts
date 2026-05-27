@@ -1,3 +1,5 @@
+import type { ApprovalUiStatus, ApprovalUiType } from "../codex/ui-events";
+
 /**
  * Codex reasoning item の表示状態。
  */
@@ -23,6 +25,26 @@ export type ToolState = {
 };
 
 /**
+ * Codex approval request の表示状態。
+ */
+export type ApprovalState = {
+  approvalRequestId: string;
+  approvalType: ApprovalUiType;
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  requestMethod: string;
+  reason?: string | null;
+  command?: string | null;
+  cwd?: string | null;
+  grantRoot?: string | null;
+  networkApprovalContext?: unknown;
+  availableDecisions?: string[];
+  requestedAtMs?: number;
+  status: ApprovalUiStatus;
+};
+
+/**
  * 1 turn 分の Codex UI event を assistant-ui parts へ変換するための中間状態。
  */
 export type CodexTurnState = {
@@ -32,6 +54,7 @@ export type CodexTurnState = {
   commentaryText: string;
   reasoningItems: Record<string, ReasoningState>;
   toolItems: Record<string, ToolState>;
+  approvalItems: Record<string, ApprovalState>;
   planText: string;
   diffText?: string;
   error?: unknown;
@@ -49,6 +72,7 @@ export function createInitialCodexTurnState(): CodexTurnState {
     commentaryText: "",
     reasoningItems: {},
     toolItems: {},
+    approvalItems: {},
     planText: "",
   };
 }

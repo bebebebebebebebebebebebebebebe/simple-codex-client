@@ -4,6 +4,7 @@
 export const CODEX_PART_TOOL_NAMES = {
   plan: "codex.plan",
   diff: "codex.diff",
+  approval: "codex.approval",
 } as const;
 
 /**
@@ -15,6 +16,7 @@ export const CODEX_PART_LABELS = {
   commentary: "進行中の説明",
   tools: "実行ログ",
   diff: "変更差分",
+  approval: "承認待ち",
 } as const;
 
 /**
