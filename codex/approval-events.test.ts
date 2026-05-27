@@ -15,7 +15,15 @@ describe("Codex approval UI events", () => {
         reason: "needs command approval",
         command: "bun test",
         cwd: "/tmp/project",
-        availableDecisions: ["accept", "decline"],
+        availableDecisions: [
+          "accept",
+          {
+            acceptWithExecpolicyAmendment: {
+              execpolicy_amendment: ["bun"],
+            },
+          },
+          "decline",
+        ],
       },
       {
         id: "request-1",
@@ -33,6 +41,9 @@ describe("Codex approval UI events", () => {
       command: "bun test",
       cwd: "/tmp/project",
       availableDecisions: ["accept", "decline"],
+      unsupportedDecisionOptions: [
+        '{"acceptWithExecpolicyAmendment":{"execpolicy_amendment":["bun"]}}',
+      ],
       requestedAtMs: 123,
       status: "requires-action",
     });

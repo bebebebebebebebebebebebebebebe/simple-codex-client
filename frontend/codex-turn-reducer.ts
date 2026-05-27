@@ -47,6 +47,28 @@ const updateApprovalStatusByItemId = (
   return changed ? next : approvals;
 };
 
+const updatePendingApprovalStatusByItemId = (
+  approvals: Record<string, ApprovalState>,
+  itemId: string,
+  status: ApprovalState["status"],
+): Record<string, ApprovalState> => {
+  let changed = false;
+  const next = Object.fromEntries(
+    Object.entries(approvals).map(([approvalRequestId, approval]) => {
+      if (
+        approval.itemId !== itemId ||
+        approval.status !== "requires-action"
+      ) {
+        return [approvalRequestId, approval];
+      }
+      changed = true;
+      return [approvalRequestId, { ...approval, status }];
+    }),
+  );
+
+  return changed ? next : approvals;
+};
+
 /**
  * tool argument を ToolFallback が表示しやすい文字列へ変換する。
  *
@@ -194,12 +216,18 @@ export function applyCodexUiEvent(
         createToolState(event.itemId, event.toolType ?? "unknown", event.toolType);
       const approvalItems =
         event.status === "declined"
-          ? updateApprovalStatusByItemId(
+          ? updatePendingApprovalStatusByItemId(
               state.approvalItems,
               event.itemId,
-              "mock-declined",
+              "declined",
             )
-          : state.approvalItems;
+          : event.status === "completed"
+            ? updatePendingApprovalStatusByItemId(
+                state.approvalItems,
+                event.itemId,
+                "accepted",
+              )
+            : state.approvalItems;
 
       return {
         ...state,
@@ -246,6 +274,7 @@ export function applyCodexUiEvent(
             grantRoot: event.grantRoot,
             networkApprovalContext: event.networkApprovalContext,
             availableDecisions: event.availableDecisions,
+            unsupportedDecisionOptions: event.unsupportedDecisionOptions,
             requestedAtMs: event.requestedAtMs,
             status: event.status,
           },
@@ -255,6 +284,27 @@ export function applyCodexUiEvent(
           [event.itemId]: {
             ...current,
             status: "requires-action",
+          },
+        },
+      };
+    }
+
+    case "approval.resolved": {
+      const current = state.approvalItems[event.approvalRequestId];
+      if (!current) return state;
+
+      return {
+        ...state,
+        turnId: state.turnId ?? event.turnId,
+        approvalItems: {
+          ...state.approvalItems,
+          [event.approvalRequestId]: {
+            ...current,
+            decision: event.decision,
+            resolvedAtMs: event.resolvedAtMs,
+            status: event.status,
+            error: event.error,
+            submittingDecision: undefined,
           },
         },
       };

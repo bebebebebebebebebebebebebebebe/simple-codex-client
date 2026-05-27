@@ -25,9 +25,22 @@ export type ApprovalUiType = "commandExecution" | "fileChange" | "network";
  */
 export type ApprovalUiStatus =
   | "requires-action"
-  | "mock-declined"
-  | "resolved"
-  | "expired";
+  | "submitting"
+  | "accepted"
+  | "accepted-for-session"
+  | "declined"
+  | "cancelled"
+  | "expired"
+  | "failed";
+
+/**
+ * Web UI から送信できる approval decision。
+ */
+export type ApprovalUiDecision =
+  | "accept"
+  | "acceptForSession"
+  | "decline"
+  | "cancel";
 
 /**
  * Codex App Server の notification を Web UI 表示用に正規化したイベント。
@@ -130,8 +143,20 @@ export type CodexUiEvent =
       grantRoot?: string | null;
       networkApprovalContext?: unknown;
       availableDecisions?: string[];
+      unsupportedDecisionOptions?: string[];
       requestedAtMs?: number;
       status: ApprovalUiStatus;
+    }
+  | {
+      type: "approval.resolved";
+      approvalRequestId: string;
+      threadId?: string;
+      turnId?: string;
+      itemId?: string;
+      decision: ApprovalUiDecision;
+      status: ApprovalUiStatus;
+      resolvedAtMs: number;
+      error?: string;
     }
   | {
       type: "turn.completed";

@@ -120,6 +120,45 @@ function startServer(port: number) {
         },
       },
 
+      "/api/approvals/:approvalRequestId": {
+        POST: async (request) => {
+          const approvalRequestId = request.params.approvalRequestId;
+          const body = (await request.json().catch(() => null)) as {
+            decision?: unknown;
+          } | null;
+
+          if (!body || body.decision === undefined) {
+            return jsonResponse(
+              { error: "decision is required" },
+              { status: 400 },
+            );
+          }
+
+          try {
+            const result = codexWebSession.submitApprovalDecision(
+              approvalRequestId,
+              body.decision,
+            );
+
+            return jsonResponse({
+              ok: true,
+              approvalRequestId,
+              decision: result.decision,
+              status: result.status,
+              resolvedAtMs: result.resolvedAtMs,
+            });
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            const status = message.startsWith("invalid approval decision")
+              ? 400
+              : 404;
+
+            return jsonResponse({ error: message }, { status });
+          }
+        },
+      },
+
       "/api/*": {
         GET: () => jsonResponse({ message: "Not found" }, { status: 404 }),
         POST: () => jsonResponse({ message: "Not found" }, { status: 404 }),

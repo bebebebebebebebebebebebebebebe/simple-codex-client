@@ -133,6 +133,17 @@ export type FileChangeApprovalDecision =
   | "cancel";
 
 /**
+ * Web UI から送信できる基本 approval decision。
+ *
+ * policy amendment 付き decision は Milestone 3 では表示のみで、送信対象に含めない。
+ */
+export type BasicApprovalDecision =
+  | "accept"
+  | "acceptForSession"
+  | "decline"
+  | "cancel";
+
+/**
  * command execution approval request params の sample client 用 subset。
  */
 export type CommandExecutionRequestApprovalParams = JsonObjectLike & {
@@ -146,7 +157,7 @@ export type CommandExecutionRequestApprovalParams = JsonObjectLike & {
   cwd?: string | null;
   commandActions?: JsonValue[] | null;
   networkApprovalContext?: JsonValue;
-  availableDecisions?: string[] | null;
+  availableDecisions?: JsonValue[] | null;
   proposedExecpolicyAmendment?: JsonValue;
   proposedNetworkPolicyAmendments?: JsonValue[] | null;
 };

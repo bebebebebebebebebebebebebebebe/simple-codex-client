@@ -15,6 +15,11 @@ import {
 } from "./notification-normalizer";
 import type { CodexUiEvent } from "./ui-events";
 import {
+  ApprovalController,
+  isBasicApprovalDecision,
+  type ApprovalDecisionResult,
+} from "./approval-controller";
+import {
   registerWebApprovalRequestHandlers,
   type ApprovalEventSink,
 } from "./web-approval-handlers";
@@ -123,6 +128,7 @@ export class CodexWebSession {
   private started = false;
   private threadId: string | null = null;
   private activeApprovalSink: ApprovalEventSink | null = null;
+  private readonly approvalController = new ApprovalController();
 
   /**
    * Codex app-server プロセスを起動し、JSON-RPC クライアントを初期化する。
@@ -153,9 +159,16 @@ export class CodexWebSession {
     });
 
     setupConnectionLogging(connection);
-    registerWebApprovalRequestHandlers(connection, (event) => {
-      this.activeApprovalSink?.(event);
+    connection.onExit(() => {
+      this.approvalController.cleanup();
     });
+    registerWebApprovalRequestHandlers(
+      connection,
+      this.approvalController,
+      (event) => {
+        this.activeApprovalSink?.(event);
+      },
+    );
 
     await client.start();
 
@@ -312,6 +325,9 @@ export class CodexWebSession {
         if (event.type === "turn.completed" || event.type === "error") break;
       }
     } finally {
+      this.approvalController.cleanup(
+        this.threadId ? { threadId: this.threadId } : undefined,
+      );
       this.activeApprovalSink = null;
       for (const unsubscribe of unsubscribers) {
         unsubscribe();
@@ -326,11 +342,31 @@ export class CodexWebSession {
    * @returns 停止処理が完了したら解決する Promise。
    */
   async stop() {
+    this.approvalController.cleanup();
     await this.client?.stop();
     this.client = null;
     this.connection = null;
     this.started = false;
     this.threadId = null;
+  }
+
+  /**
+   * Web UI から送られた approval decision で pending approval を解決する。
+   *
+   * @param approvalRequestId - 解決対象の approval request id。
+   * @param decision - Web UI から送られた decision 値。
+   * @returns approval controller が確定した decision と表示 status。
+   * @throws decision が不正、または pending approval が存在しない場合。
+   */
+  submitApprovalDecision(
+    approvalRequestId: string,
+    decision: unknown,
+  ): ApprovalDecisionResult {
+    if (!isBasicApprovalDecision(decision)) {
+      throw new Error(`invalid approval decision: ${String(decision)}`);
+    }
+
+    return this.approvalController.submitDecision(approvalRequestId, decision);
   }
 }
 

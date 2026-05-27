@@ -179,12 +179,20 @@ describe("Codex turn reducer", () => {
       reason: "needs command approval",
       command: "bun test",
       cwd: "/tmp/project",
+      availableDecisions: ["accept", "cancel"],
+      unsupportedDecisionOptions: [
+        '{"acceptWithExecpolicyAmendment":{"execpolicy_amendment":["bun"]}}',
+      ],
       status: "requires-action",
     });
 
     expect(state.approvalItems["approval-1"]).toMatchObject({
       approvalType: "commandExecution",
       command: "bun test",
+      availableDecisions: ["accept", "cancel"],
+      unsupportedDecisionOptions: [
+        '{"acceptWithExecpolicyAmendment":{"execpolicy_amendment":["bun"]}}',
+      ],
       status: "requires-action",
     });
     expect(state.toolItems["tool-1"]).toMatchObject({
@@ -233,7 +241,48 @@ describe("Codex turn reducer", () => {
     });
   });
 
-  test("declined tool completion marks matching approval as mock declined", () => {
+  test("approval resolved event stores decision metadata", () => {
+    let state = createInitialCodexTurnState();
+
+    state = applyCodexUiEvent(state, {
+      type: "approval.requested",
+      approvalRequestId: "approval-1",
+      approvalType: "commandExecution",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      requestMethod: "item/commandExecution/requestApproval",
+      status: "requires-action",
+    });
+    state = applyCodexUiEvent(state, {
+      type: "approval.resolved",
+      approvalRequestId: "approval-1",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      decision: "accept",
+      status: "accepted",
+      resolvedAtMs: 1234,
+    });
+
+    expect(state.approvalItems["approval-1"]).toMatchObject({
+      decision: "accept",
+      status: "accepted",
+      resolvedAtMs: 1234,
+    });
+
+    const result = toAssistantRunResult(state);
+    expect(result.content?.[0]).toMatchObject({
+      type: "tool-call",
+      toolName: CODEX_PART_TOOL_NAMES.approval,
+      result: expect.objectContaining({
+        decision: "accept",
+        status: "accepted",
+      }),
+    });
+  });
+
+  test("declined tool completion marks matching approval as declined", () => {
     let state = createInitialCodexTurnState();
 
     state = applyCodexUiEvent(state, {
@@ -254,7 +303,68 @@ describe("Codex turn reducer", () => {
       status: "declined",
     });
 
-    expect(state.approvalItems["approval-1"]?.status).toBe("mock-declined");
+    expect(state.approvalItems["approval-1"]?.status).toBe("declined");
+  });
+
+  test("completed tool completion marks still-pending approval as accepted", () => {
+    let state = createInitialCodexTurnState();
+
+    state = applyCodexUiEvent(state, {
+      type: "approval.requested",
+      approvalRequestId: "approval-1",
+      approvalType: "commandExecution",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      requestMethod: "item/commandExecution/requestApproval",
+      status: "requires-action",
+    });
+    state = applyCodexUiEvent(state, {
+      type: "tool.completed",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      toolType: "commandExecution",
+      status: "completed",
+    });
+
+    expect(state.approvalItems["approval-1"]?.status).toBe("accepted");
+  });
+
+  test("tool completion does not overwrite resolved approval decision", () => {
+    let state = createInitialCodexTurnState();
+
+    state = applyCodexUiEvent(state, {
+      type: "approval.requested",
+      approvalRequestId: "approval-1",
+      approvalType: "commandExecution",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      requestMethod: "item/commandExecution/requestApproval",
+      status: "requires-action",
+    });
+    state = applyCodexUiEvent(state, {
+      type: "approval.resolved",
+      approvalRequestId: "approval-1",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      decision: "cancel",
+      status: "cancelled",
+      resolvedAtMs: 1234,
+    });
+    state = applyCodexUiEvent(state, {
+      type: "tool.completed",
+      turnId: "turn-1",
+      itemId: "tool-1",
+      toolType: "commandExecution",
+      status: "declined",
+    });
+
+    expect(state.approvalItems["approval-1"]).toMatchObject({
+      decision: "cancel",
+      status: "cancelled",
+    });
   });
 
   test("final answer is projected as a normal text part", () => {

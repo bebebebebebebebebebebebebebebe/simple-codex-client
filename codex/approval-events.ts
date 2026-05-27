@@ -51,6 +51,27 @@ export const asStringArray = (value: unknown): string[] | undefined => {
   return values.length > 0 ? values : undefined;
 };
 
+const formatUnsupportedDecisionOption = (value: unknown): string | undefined => {
+  if (typeof value === "string") return undefined;
+  if (value === undefined || value === null) return undefined;
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const getUnsupportedDecisionOptions = (
+  value: unknown,
+): string[] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+  const values = value
+    .map(formatUnsupportedDecisionOption)
+    .filter((item): item is string => Boolean(item));
+  return values.length > 0 ? values : undefined;
+};
+
 /**
  * command execution approval request を Web UI 表示用 event に変換する。
  *
@@ -78,6 +99,9 @@ export const createCommandApprovalRequestedEvent = (
     cwd: params.cwd,
     networkApprovalContext: params.networkApprovalContext as JsonValue | undefined,
     availableDecisions: asStringArray(params.availableDecisions),
+    unsupportedDecisionOptions: getUnsupportedDecisionOptions(
+      params.availableDecisions,
+    ),
     requestedAtMs: params.startedAtMs,
     status: "requires-action",
   };

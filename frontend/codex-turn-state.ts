@@ -1,4 +1,5 @@
 import type { ApprovalUiStatus, ApprovalUiType } from "../codex/ui-events";
+import type { BasicApprovalDecision } from "../codex/types";
 
 /**
  * Codex reasoning item の表示状態。
@@ -40,8 +41,13 @@ export type ApprovalState = {
   grantRoot?: string | null;
   networkApprovalContext?: unknown;
   availableDecisions?: string[];
+  unsupportedDecisionOptions?: string[];
   requestedAtMs?: number;
   status: ApprovalUiStatus;
+  decision?: BasicApprovalDecision;
+  resolvedAtMs?: number;
+  error?: string;
+  submittingDecision?: BasicApprovalDecision;
 };
 
 /**
