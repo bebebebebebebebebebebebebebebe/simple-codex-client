@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import {
+  CODEX_PART_TOOL_NAMES,
+  CODEX_REASONING_PREFIXES,
+} from "./codex-part-names";
 import { applyCodexUiEvent } from "./codex-turn-reducer";
 import { createInitialCodexTurnState } from "./codex-turn-state";
 import { toAssistantRunResult } from "./to-assistant-parts";
@@ -32,6 +36,13 @@ describe("Codex turn reducer", () => {
       "first",
       "second",
     ]);
+
+    const result = toAssistantRunResult(state);
+
+    expect(result.content?.[0]).toMatchObject({
+      type: "reasoning",
+      text: `${CODEX_REASONING_PREFIXES.reasoningSummary}first\n\nsecond`,
+    });
   });
 
   test("command tool events are merged by item id", () => {
@@ -111,13 +122,15 @@ describe("Codex turn reducer", () => {
     const result = toAssistantRunResult(state);
 
     expect(result.content?.[0]).toMatchObject({
-      type: "reasoning",
-      text: "## Plan\nPlan\n[x] Read files\n[>] Implement",
+      type: "tool-call",
+      toolCallId: "turn-plan",
+      toolName: CODEX_PART_TOOL_NAMES.plan,
+      result: "Plan\n[x] Read files\n[>] Implement",
     });
     expect(result.content?.[1]).toMatchObject({
       type: "tool-call",
       toolCallId: "turn-diff",
-      toolName: "file changes",
+      toolName: CODEX_PART_TOOL_NAMES.diff,
       result: "diff --git a/file b/file",
     });
   });
@@ -146,6 +159,29 @@ describe("Codex turn reducer", () => {
       "reasoning",
       "tool-call",
     ]);
+    expect(result.content?.[0]).toMatchObject({
+      type: "reasoning",
+      text: `${CODEX_REASONING_PREFIXES.commentary}checking`,
+    });
+  });
+
+  test("final answer is projected as a normal text part", () => {
+    let state = createInitialCodexTurnState();
+
+    state = applyCodexUiEvent(state, {
+      type: "message.delta",
+      turnId: "turn-1",
+      itemId: "final-1",
+      phase: "final_answer",
+      text: "done",
+    });
+
+    const result = toAssistantRunResult(state);
+
+    expect(result.content?.[0]).toEqual({
+      type: "text",
+      text: "done",
+    });
   });
 
   test("turn completed and error events update assistant message status", () => {

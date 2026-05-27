@@ -3,6 +3,10 @@ import type {
   MessageStatus,
   ThreadAssistantMessagePart,
 } from "@assistant-ui/react";
+import {
+  CODEX_PART_TOOL_NAMES,
+  CODEX_REASONING_PREFIXES,
+} from "./codex-part-names";
 import type { CodexTurnState, ToolState } from "./codex-turn-state";
 
 const createMessageStatus = (state: CodexTurnState): MessageStatus => {
@@ -59,9 +63,13 @@ export function toAssistantRunResult(
 
   if (state.planText) {
     content.push({
-      type: "reasoning",
-      text: `## Plan\n${state.planText}`,
-    });
+      type: "tool-call",
+      toolCallId: "turn-plan",
+      toolName: CODEX_PART_TOOL_NAMES.plan,
+      args: {},
+      argsText: "",
+      result: state.planText,
+    } as ThreadAssistantMessagePart);
   }
 
   for (const reasoning of Object.values(state.reasoningItems)) {
@@ -69,7 +77,7 @@ export function toAssistantRunResult(
     if (text) {
       content.push({
         type: "reasoning",
-        text,
+        text: `${CODEX_REASONING_PREFIXES.reasoningSummary}${text}`,
       });
     }
   }
@@ -77,7 +85,7 @@ export function toAssistantRunResult(
   if (state.commentaryText) {
     content.push({
       type: "reasoning",
-      text: state.commentaryText,
+      text: `${CODEX_REASONING_PREFIXES.commentary}${state.commentaryText}`,
     });
   }
 
@@ -89,7 +97,7 @@ export function toAssistantRunResult(
     content.push({
       type: "tool-call",
       toolCallId: "turn-diff",
-      toolName: "file changes",
+      toolName: CODEX_PART_TOOL_NAMES.diff,
       args: {},
       argsText: "",
       result: state.diffText,

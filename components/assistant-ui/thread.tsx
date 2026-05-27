@@ -3,7 +3,9 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
+import { DiffSummaryCard } from "@/components/codex-ui/diff-summary-card";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
+import { PlanCard } from "@/components/codex-ui/plan-card";
 import {
   Reasoning,
   ReasoningContent,
@@ -19,6 +21,11 @@ import {
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
+import {
+  CODEX_PART_LABELS,
+  CODEX_PART_TOOL_NAMES,
+  CODEX_REASONING_PREFIXES,
+} from "@/frontend/codex-part-names";
 import { cn } from "@/lib/utils";
 import {
   ActionBarMorePrimitive,
@@ -184,13 +191,13 @@ const ComposerAction: FC = () => {
       <AuiIf condition={(s) => !s.thread.isRunning}>
         <ComposerPrimitive.Send asChild>
           <TooltipIconButton
-            tooltip="Send message"
+            tooltip="送信"
             side="bottom"
             type="button"
             variant="default"
             size="icon"
             className="aui-composer-send size-8 rounded-full"
-            aria-label="Send message"
+            aria-label="送信"
           >
             <ArrowUpIcon className="aui-composer-send-icon size-4" />
           </TooltipIconButton>
@@ -203,7 +210,7 @@ const ComposerAction: FC = () => {
             variant="default"
             size="icon"
             className="aui-composer-cancel size-8 rounded-full"
-            aria-label="Stop generating"
+            aria-label="生成を停止"
           >
             <SquareIcon className="aui-composer-cancel-icon size-3 fill-current" />
           </Button>
@@ -242,31 +249,62 @@ const AssistantMessage: FC = () => {
       >
         <MessagePrimitive.GroupedParts
           groupBy={(part) => {
-            if (part.type === "reasoning")
-              return ["group-chainOfThought", "group-reasoning"];
+            if (part.type === "reasoning") {
+              if (part.text.startsWith(CODEX_REASONING_PREFIXES.commentary)) {
+                return ["group-progress", "group-commentary"];
+              }
+              return ["group-progress", "group-reasoning-summary"];
+            }
             if (part.type === "tool-call") {
               if (getMcpAppFromToolPart(part)) return null;
-              return ["group-chainOfThought", "group-tool"];
+              if (part.toolName === CODEX_PART_TOOL_NAMES.plan) {
+                return ["group-progress", "group-plan"];
+              }
+              if (part.toolName === CODEX_PART_TOOL_NAMES.diff) {
+                return ["group-diff"];
+              }
+              return ["group-tools"];
             }
             return null;
           }}
         >
           {({ part, children }) => {
             switch (part.type) {
-              case "group-chainOfThought":
-                return <div data-slot="aui_chain-of-thought">{children}</div>;
-              case "group-reasoning": {
+              case "group-progress":
+                return <div data-slot="aui_codex-progress">{children}</div>;
+              case "group-reasoning-summary": {
                 const running = part.status.type === "running";
                 return (
                   <ReasoningRoot defaultOpen={running}>
-                    <ReasoningTrigger active={running} />
+                    <ReasoningTrigger
+                      active={running}
+                      label={CODEX_PART_LABELS.reasoningSummary}
+                    />
                     <ReasoningContent aria-busy={running}>
                       <ReasoningText>{children}</ReasoningText>
                     </ReasoningContent>
                   </ReasoningRoot>
                 );
               }
-              case "group-tool":
+              case "group-commentary": {
+                const running = part.status.type === "running";
+                return (
+                  <ReasoningRoot defaultOpen={running}>
+                    <ReasoningTrigger
+                      active={running}
+                      label={CODEX_PART_LABELS.commentary}
+                    />
+                    <ReasoningContent aria-busy={running}>
+                      <ReasoningText>{children}</ReasoningText>
+                    </ReasoningContent>
+                  </ReasoningRoot>
+                );
+              }
+              case "group-plan":
+                return <div data-slot="aui_codex-plan">{children}</div>;
+              case "group-diff":
+                return <div data-slot="aui_codex-diff">{children}</div>;
+              case "group-tools":
                 return (
                   <ToolGroupRoot>
                     <ToolGroupTrigger
@@ -281,6 +319,12 @@ const AssistantMessage: FC = () => {
               case "reasoning":
                 return <Reasoning {...part} />;
               case "tool-call":
+                if (part.toolName === CODEX_PART_TOOL_NAMES.plan) {
+                  return <PlanCard text={String(part.result ?? "")} />;
+                }
+                if (part.toolName === CODEX_PART_TOOL_NAMES.diff) {
+                  return <DiffSummaryCard diff={String(part.result ?? "")} />;
+                }
                 return part.toolUI ?? <ToolFallback {...part} />;
               default:
                 return null;
