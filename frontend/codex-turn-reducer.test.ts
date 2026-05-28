@@ -8,6 +8,20 @@ import { createInitialCodexTurnState } from "./codex-turn-state";
 import { toAssistantRunResult } from "./to-assistant-parts";
 
 describe("Codex turn reducer", () => {
+  test("assistant run result starts with the run status part", () => {
+    const result = toAssistantRunResult(createInitialCodexTurnState());
+
+    expect(result.content?.[0]).toMatchObject({
+      type: "tool-call",
+      toolCallId: "turn-run-status",
+      toolName: CODEX_PART_TOOL_NAMES.runStatus,
+      result: expect.objectContaining({
+        kind: "running",
+        label: "AI作業中",
+      }),
+    });
+  });
+
   test("reasoning summary deltas are grouped by item and summary index", () => {
     let state = createInitialCodexTurnState();
 
@@ -39,7 +53,7 @@ describe("Codex turn reducer", () => {
 
     const result = toAssistantRunResult(state);
 
-    expect(result.content?.[0]).toMatchObject({
+    expect(result.content?.[1]).toMatchObject({
       type: "reasoning",
       text: `${CODEX_REASONING_PREFIXES.reasoningSummary}first\n\nsecond`,
     });
@@ -121,13 +135,13 @@ describe("Codex turn reducer", () => {
 
     const result = toAssistantRunResult(state);
 
-    expect(result.content?.[0]).toMatchObject({
+    expect(result.content?.[1]).toMatchObject({
       type: "tool-call",
       toolCallId: "turn-plan",
       toolName: CODEX_PART_TOOL_NAMES.plan,
       result: "Plan\n[x] Read files\n[>] Implement",
     });
-    expect(result.content?.[1]).toMatchObject({
+    expect(result.content?.[2]).toMatchObject({
       type: "tool-call",
       toolCallId: "turn-diff",
       toolName: CODEX_PART_TOOL_NAMES.diff,
@@ -156,10 +170,11 @@ describe("Codex turn reducer", () => {
     const result = toAssistantRunResult(state);
 
     expect(result.content?.map((part) => part.type)).toEqual([
+      "tool-call",
       "reasoning",
       "tool-call",
     ]);
-    expect(result.content?.[0]).toMatchObject({
+    expect(result.content?.[1]).toMatchObject({
       type: "reasoning",
       text: `${CODEX_REASONING_PREFIXES.commentary}checking`,
     });
@@ -226,7 +241,7 @@ describe("Codex turn reducer", () => {
 
     const result = toAssistantRunResult(state);
 
-    expect(result.content?.[0]).toMatchObject({
+    expect(result.content?.[1]).toMatchObject({
       type: "tool-call",
       toolCallId: "approval-1",
       toolName: CODEX_PART_TOOL_NAMES.approval,
@@ -235,7 +250,7 @@ describe("Codex turn reducer", () => {
         command: "bun test",
       }),
     });
-    expect(result.content?.[1]).toMatchObject({
+    expect(result.content?.[2]).toMatchObject({
       type: "tool-call",
       toolName: "shell",
     });
@@ -272,7 +287,7 @@ describe("Codex turn reducer", () => {
     });
 
     const result = toAssistantRunResult(state);
-    expect(result.content?.[0]).toMatchObject({
+    expect(result.content?.[1]).toMatchObject({
       type: "tool-call",
       toolName: CODEX_PART_TOOL_NAMES.approval,
       result: expect.objectContaining({
@@ -380,7 +395,7 @@ describe("Codex turn reducer", () => {
 
     const result = toAssistantRunResult(state);
 
-    expect(result.content?.[0]).toEqual({
+    expect(result.content?.[1]).toEqual({
       type: "text",
       text: "done",
     });
@@ -406,7 +421,7 @@ describe("Codex turn reducer", () => {
       reason: "error",
       error: "failed",
     });
-    expect(toAssistantRunResult(failed).content?.[0]).toEqual({
+    expect(toAssistantRunResult(failed).content?.[1]).toEqual({
       type: "text",
       text: "failed",
     });

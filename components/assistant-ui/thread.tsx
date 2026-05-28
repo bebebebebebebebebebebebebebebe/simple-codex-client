@@ -7,6 +7,7 @@ import { ApprovalCard } from "@/components/codex-ui/approval-card";
 import { DiffSummaryCard } from "@/components/codex-ui/diff-summary-card";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { PlanCard } from "@/components/codex-ui/plan-card";
+import { RunStatusBar } from "@/components/codex-ui/run-status-bar";
 import {
   Reasoning,
   ReasoningContent,
@@ -27,6 +28,7 @@ import {
   CODEX_PART_TOOL_NAMES,
   CODEX_REASONING_PREFIXES,
 } from "@/frontend/codex-part-names";
+import type { RunStatusViewModel } from "@/frontend/derive-run-status";
 import type { ApprovalState } from "@/frontend/codex-turn-state";
 import { cn } from "@/lib/utils";
 import {
@@ -259,6 +261,9 @@ const AssistantMessage: FC = () => {
             }
             if (part.type === "tool-call") {
               if (getMcpAppFromToolPart(part)) return null;
+              if (part.toolName === CODEX_PART_TOOL_NAMES.runStatus) {
+                return ["group-run-status"];
+              }
               if (part.toolName === CODEX_PART_TOOL_NAMES.approval) {
                 return ["group-approval"];
               }
@@ -275,6 +280,8 @@ const AssistantMessage: FC = () => {
         >
           {({ part, children }) => {
             switch (part.type) {
+              case "group-run-status":
+                return <div data-slot="aui_codex-run-status">{children}</div>;
               case "group-progress":
                 return <div data-slot="aui_codex-progress">{children}</div>;
               case "group-reasoning-summary": {
@@ -326,6 +333,13 @@ const AssistantMessage: FC = () => {
               case "reasoning":
                 return <Reasoning {...part} />;
               case "tool-call":
+                if (part.toolName === CODEX_PART_TOOL_NAMES.runStatus) {
+                  return (
+                    <RunStatusBar
+                      status={part.result as RunStatusViewModel}
+                    />
+                  );
+                }
                 if (part.toolName === CODEX_PART_TOOL_NAMES.approval) {
                   return (
                     <ApprovalCard approval={part.result as ApprovalState} />

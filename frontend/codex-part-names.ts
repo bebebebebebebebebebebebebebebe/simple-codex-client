@@ -2,6 +2,7 @@
  * Codex 固有の assistant-ui tool-call 名を集約する。
  */
 export const CODEX_PART_TOOL_NAMES = {
+  runStatus: "codex.run_status",
   plan: "codex.plan",
   diff: "codex.diff",
   approval: "codex.approval",
@@ -11,6 +12,7 @@ export const CODEX_PART_TOOL_NAMES = {
  * Codex の進行中表示で使う日本語ラベルを集約する。
  */
 export const CODEX_PART_LABELS = {
+  runStatus: "AIの作業状況",
   plan: "作業計画",
   reasoningSummary: "推論サマリー",
   commentary: "進行中の説明",

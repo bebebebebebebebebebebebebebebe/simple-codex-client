@@ -7,7 +7,12 @@ import {
   CODEX_PART_TOOL_NAMES,
   CODEX_REASONING_PREFIXES,
 } from "./codex-part-names";
-import type { ApprovalState, CodexTurnState, ToolState } from "./codex-turn-state";
+import type {
+  ApprovalState,
+  CodexTurnState,
+  ToolState,
+} from "./codex-turn-state";
+import { deriveRunStatus } from "./derive-run-status";
 
 const createMessageStatus = (state: CodexTurnState): MessageStatus => {
   const error =
@@ -73,6 +78,15 @@ export function toAssistantRunResult(
   state: CodexTurnState,
 ): ChatModelRunResult {
   const content: ThreadAssistantMessagePart[] = [];
+
+  content.push({
+    type: "tool-call",
+    toolCallId: "turn-run-status",
+    toolName: CODEX_PART_TOOL_NAMES.runStatus,
+    args: {},
+    argsText: "",
+    result: deriveRunStatus(state),
+  } as ThreadAssistantMessagePart);
 
   if (state.planText) {
     content.push({
