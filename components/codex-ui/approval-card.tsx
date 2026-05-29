@@ -1,14 +1,27 @@
-import { CODEX_PART_LABELS } from "@/frontend/codex-part-names";
 import type { ApprovalState } from "@/frontend/codex-turn-state";
 import { submitApprovalDecision } from "@/frontend/approval-api";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import type { BasicApprovalDecision } from "@/codex/types";
+import { ChevronDownIcon, ShieldAlertIcon } from "lucide-react";
 import type { FC } from "react";
 import { useMemo, useState } from "react";
 
 type ApprovalCardProps = {
   approval: ApprovalState;
 };
+
+/**
+ * 承認カードのタイトルは状態に依らず中立な文言に固定する。
+ * 進行中か解決済みかは右側のステータスバッジでのみ表現し、
+ * タイトルとバッジが矛盾しないようにする。
+ */
+const APPROVAL_CARD_TITLE = "承認リクエスト";
 
 const getApprovalTypeLabel = (
   approvalType: ApprovalState["approvalType"],
@@ -120,10 +133,11 @@ export const ApprovalCard: FC<ApprovalCardProps> = ({ approval }) => {
   };
 
   return (
-    <section className="mb-4 rounded-lg border border-amber-300/70 bg-amber-50/40 px-3 py-2 text-sm dark:border-amber-800/80 dark:bg-amber-950/20">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <div className="font-medium">{CODEX_PART_LABELS.approval}</div>
-        <span className="rounded-md border bg-background px-1.5 py-0.5 text-xs text-muted-foreground">
+    <section className="mb-4 rounded-xl border border-amber-300/70 bg-amber-50/50 px-4 py-3 text-sm shadow-sm dark:border-amber-800/80 dark:bg-amber-950/20">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <ShieldAlertIcon className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="font-medium">{APPROVAL_CARD_TITLE}</div>
+        <span className="ml-auto rounded-full border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
           {APPROVAL_STATUS_LABELS[approval.status]}
         </span>
       </div>
@@ -181,24 +195,49 @@ export const ApprovalCard: FC<ApprovalCardProps> = ({ approval }) => {
           </div>
         ) : null}
 
-        {approval.availableDecisions?.length ? (
-          <div>
-            <dt className="font-medium text-foreground">利用可能な判断</dt>
-            <dd>{approval.availableDecisions.join(", ")}</dd>
-          </div>
-        ) : null}
-
-        {approval.unsupportedDecisionOptions?.length ? (
-          <div>
-            <dt className="font-medium text-foreground">未対応の承認オプション</dt>
-            <dd>
-              <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-md border bg-background p-2 text-xs">
-                {approval.unsupportedDecisionOptions.join("\n")}
-              </pre>
-            </dd>
-          </div>
-        ) : null}
       </dl>
+
+      {approval.availableDecisions?.length ||
+      approval.unsupportedDecisionOptions?.length ? (
+        <Collapsible className="mt-3">
+          <CollapsibleTrigger className="group/details flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
+            <ChevronDownIcon
+              className={cn(
+                "size-3.5 shrink-0 transition-transform duration-200 ease-out",
+                "group-data-[state=closed]/details:-rotate-90",
+              )}
+            />
+            詳細
+          </CollapsibleTrigger>
+          <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+            <dl className="mt-2 space-y-2 text-muted-foreground">
+              {approval.availableDecisions?.length ? (
+                <div>
+                  <dt className="font-medium text-foreground">
+                    利用可能な判断
+                  </dt>
+                  <dd className="font-mono text-xs">
+                    {approval.availableDecisions.join(", ")}
+                  </dd>
+                </div>
+              ) : null}
+
+              {approval.unsupportedDecisionOptions?.length ? (
+                <div>
+                  <dt className="font-medium text-foreground">
+                    未対応の承認オプション
+                  </dt>
+                  <dd>
+                    <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-md border bg-background p-2 text-xs">
+                      {approval.unsupportedDecisionOptions.join("\n")}
+                    </pre>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : null}
 
       {isResolved ? (
         <p className="mt-3 text-xs text-muted-foreground">
@@ -228,7 +267,7 @@ export const ApprovalCard: FC<ApprovalCardProps> = ({ approval }) => {
         </div>
       ) : (
         <p className="mt-3 text-xs text-muted-foreground">
-          この承認リクエストには Milestone 3 で送信できる基本 decision がありません。
+          この承認リクエストに応答できる選択肢がありません。
         </p>
       )}
 
