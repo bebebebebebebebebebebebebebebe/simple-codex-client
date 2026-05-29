@@ -28,6 +28,10 @@ import {
   CODEX_PART_TOOL_NAMES,
   CODEX_REASONING_PREFIXES,
 } from "@/frontend/codex-part-names";
+import {
+  resolveApprovalForMessage,
+  resolveRunStatusForMessage,
+} from "@/frontend/message-cancel-overrides";
 import type { RunStatusViewModel } from "@/frontend/derive-run-status";
 import type { ApprovalState } from "@/frontend/codex-turn-state";
 import { cn } from "@/lib/utils";
@@ -214,7 +218,7 @@ const ComposerAction: FC = () => {
             variant="default"
             size="icon"
             className="aui-composer-cancel size-8 rounded-full"
-            aria-label="生成を停止"
+            aria-label="AIの作業を中断"
           >
             <SquareIcon className="aui-composer-cancel-icon size-3 fill-current" />
           </Button>
@@ -240,6 +244,7 @@ const AssistantMessage: FC = () => {
   // for pt-[n] use -mb-[n + 6] & min-h-[n + 6] to preserve compensation
   const ACTION_BAR_PT = "pt-1.5";
   const ACTION_BAR_HEIGHT = `-mb-7.5 min-h-7.5 ${ACTION_BAR_PT}`;
+  const messageStatus = useAuiState((s) => s.message.status);
 
   return (
     <MessagePrimitive.Root
@@ -336,13 +341,21 @@ const AssistantMessage: FC = () => {
                 if (part.toolName === CODEX_PART_TOOL_NAMES.runStatus) {
                   return (
                     <RunStatusBar
-                      status={part.result as RunStatusViewModel}
+                      status={resolveRunStatusForMessage(
+                        part.result as RunStatusViewModel,
+                        messageStatus,
+                      )}
                     />
                   );
                 }
                 if (part.toolName === CODEX_PART_TOOL_NAMES.approval) {
                   return (
-                    <ApprovalCard approval={part.result as ApprovalState} />
+                    <ApprovalCard
+                      approval={resolveApprovalForMessage(
+                        part.result as ApprovalState,
+                        messageStatus,
+                      )}
+                    />
                   );
                 }
                 if (part.toolName === CODEX_PART_TOOL_NAMES.plan) {

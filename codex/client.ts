@@ -12,6 +12,8 @@ import type {
   InitializeResponse,
   ThreadStartParams,
   ThreadStartResponse,
+  TurnInterruptParams,
+  TurnInterruptResponse,
   TurnStartParams,
   TurnStartResponse,
 } from "./types";
@@ -131,6 +133,22 @@ export class CodexAppServerClient {
   async startTurn(params: TurnStartParams): Promise<TurnStartResponse> {
     return this.connection.request<TurnStartResponse>(
       "turn/start",
+      asJsonValue(params),
+    );
+  }
+
+  /**
+   * `turn/interrupt` request を送る typed wrapper。
+   *
+   * @param params - 中断対象の thread ID と turn ID。
+   * @returns Codex App Server が返す空 object result。
+   * @throws JSON-RPC request が失敗した場合。
+   */
+  async interruptTurn(
+    params: TurnInterruptParams,
+  ): Promise<TurnInterruptResponse> {
+    return this.connection.request<TurnInterruptResponse>(
+      "turn/interrupt",
       asJsonValue(params),
     );
   }

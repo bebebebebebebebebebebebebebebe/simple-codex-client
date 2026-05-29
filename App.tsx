@@ -8,7 +8,9 @@ import { Sidebar } from "@/components/chat/Sidebar";
 import { parseCodexSseChunk } from "@/frontend/codex-sse-parser";
 import { applyCodexUiEvent } from "@/frontend/codex-turn-reducer";
 import { createInitialCodexTurnState } from "@/frontend/codex-turn-state";
+import { markCodexTurnInterrupted } from "@/frontend/codex-turn-interrupt";
 import { toAssistantRunResult } from "@/frontend/to-assistant-parts";
+import { interruptCurrentTurn } from "@/frontend/turn-interrupt-api";
 import {
   Outlet,
   RouterProvider,
@@ -48,68 +50,92 @@ const codexModel: ChatModelAdapter = {
       return;
     }
 
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ message: input }),
-      signal: abortSignal,
-    });
-
-    if (!response.ok || !response.body) {
-      yield {
-        content: [
-          {
-            type: "text",
-            text: `Codex API request failed: ${response.status}`,
-          },
-        ],
-      };
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
     let buffer = "";
     let state = createInitialCodexTurnState();
 
-    while (true) {
-      if (abortSignal.aborted) return;
+    const onAbort = () => {
+      void interruptCurrentTurn().catch(() => undefined);
+    };
 
-      const { value, done } = await reader.read();
-      if (done) {
-        if (buffer) {
-          const parsed = parseCodexSseChunk(buffer, "\n\n");
-          buffer = parsed.buffer;
+    abortSignal.addEventListener("abort", onAbort, { once: true });
 
-          for (const payload of parsed.events) {
-            state = applyCodexUiEvent(state, payload);
-            yield toAssistantRunResult(state);
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ message: input }),
+        signal: abortSignal,
+      });
 
-            if (payload.type === "turn.completed" || payload.type === "error") {
-              return;
-            }
-          }
-        }
-        break;
+      if (!response.ok || !response.body) {
+        yield {
+          content: [
+            {
+              type: "text",
+              text: `Codex API request failed: ${response.status}`,
+            },
+          ],
+        };
+        return;
       }
 
-      const parsed = parseCodexSseChunk(
-        buffer,
-        decoder.decode(value, { stream: true }),
-      );
-      buffer = parsed.buffer;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
-      for (const payload of parsed.events) {
-        state = applyCodexUiEvent(state, payload);
-        yield toAssistantRunResult(state);
-
-        if (payload.type === "turn.completed" || payload.type === "error") {
+      while (true) {
+        if (abortSignal.aborted) {
+          state = markCodexTurnInterrupted(state);
+          yield toAssistantRunResult(state);
           return;
         }
+
+        const { value, done } = await reader.read();
+        if (done) {
+          if (buffer) {
+            const parsed = parseCodexSseChunk(buffer, "\n\n");
+            buffer = parsed.buffer;
+
+            for (const payload of parsed.events) {
+              state = applyCodexUiEvent(state, payload);
+              yield toAssistantRunResult(state);
+
+              if (
+                payload.type === "turn.completed" ||
+                payload.type === "error"
+              ) {
+                return;
+              }
+            }
+          }
+          break;
+        }
+
+        const parsed = parseCodexSseChunk(
+          buffer,
+          decoder.decode(value, { stream: true }),
+        );
+        buffer = parsed.buffer;
+
+        for (const payload of parsed.events) {
+          state = applyCodexUiEvent(state, payload);
+          yield toAssistantRunResult(state);
+
+          if (payload.type === "turn.completed" || payload.type === "error") {
+            return;
+          }
+        }
       }
+    } catch (error) {
+      if (abortSignal.aborted) {
+        state = markCodexTurnInterrupted(state);
+        yield toAssistantRunResult(state);
+        return;
+      }
+      throw error;
+    } finally {
+      abortSignal.removeEventListener("abort", onAbort);
     }
   },
 };

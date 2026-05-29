@@ -117,6 +117,29 @@ class AsyncQueue<T> {
   }
 }
 
+type ActiveTurn = {
+  threadId: string;
+  turnId: string;
+  interrupting: boolean;
+};
+
+export type InterruptCurrentTurnResult =
+  | {
+      ok: true;
+      status: "interrupt-requested" | "already-interrupting";
+      threadId: string;
+      turnId: string;
+    }
+  | {
+      ok: false;
+      status: "no-active-turn" | "client-not-initialized";
+      message: string;
+    };
+
+type RunTurnOptions = {
+  signal?: AbortSignal;
+};
+
 /**
  * Web UI から Codex app-server のスレッドとターンを扱うためのセッション管理クラス。
  *
@@ -127,6 +150,7 @@ export class CodexWebSession {
   private connection: JsonRpcConnection | null = null;
   private started = false;
   private threadId: string | null = null;
+  private activeTurn: ActiveTurn | null = null;
   private activeApprovalSink: ApprovalEventSink | null = null;
   private readonly approvalController = new ApprovalController();
 
@@ -186,7 +210,10 @@ export class CodexWebSession {
    * @param inputText - Codex へ送信するユーザー入力テキスト。
    * @returns Web UI が SSE として送信できるチャット進行イベントの async iterable。
    */
-  async *runTurn(inputText: string): AsyncIterable<CodexUiEvent> {
+  async *runTurn(
+    inputText: string,
+    options: RunTurnOptions = {},
+  ): AsyncIterable<CodexUiEvent> {
     await this.start();
 
     const client = this.client;
@@ -304,6 +331,8 @@ export class CodexWebSession {
       }),
     );
 
+    let startedTurnId: string | null = null;
+
     try {
       const turnResult = await client.startTurn({
         threadId: this.threadId,
@@ -313,11 +342,24 @@ export class CodexWebSession {
       const turn = isRecord(turnResult.turn) ? turnResult.turn : undefined;
       const turnId = asString(turn?.["id"]);
       if (turnId) {
+        startedTurnId = turnId;
+        this.activeTurn = {
+          threadId: this.threadId,
+          turnId,
+          interrupting: false,
+        };
+
         queue.push({
           type: "turn.started",
           threadId: this.threadId,
           turnId,
         });
+
+        if (options.signal?.aborted) {
+          void this.interruptCurrentTurn().catch((error) => {
+            console.error("[codex interrupt after start failed]", error);
+          });
+        }
       }
 
       for await (const event of queue) {
@@ -329,11 +371,76 @@ export class CodexWebSession {
         this.threadId ? { threadId: this.threadId } : undefined,
       );
       this.activeApprovalSink = null;
+      if (!this.activeTurn || this.activeTurn.turnId === startedTurnId) {
+        this.activeTurn = null;
+      }
       for (const unsubscribe of unsubscribers) {
         unsubscribe();
       }
       queue.close();
     }
+  }
+
+  /**
+   * 現在実行中の turn に `turn/interrupt` を送信する。
+   *
+   * @returns 中断要求の送信結果。実行中 turn がない場合は失敗 result を返す。
+   * @throws Codex App Server への interrupt request が失敗した場合。
+   */
+  async interruptCurrentTurn(): Promise<InterruptCurrentTurnResult> {
+    const activeTurn = this.activeTurn;
+    if (!activeTurn) {
+      return {
+        ok: false,
+        status: "no-active-turn",
+        message: "No active Codex turn to interrupt",
+      };
+    }
+
+    const client = this.client;
+    if (!client) {
+      return {
+        ok: false,
+        status: "client-not-initialized",
+        message: "Codex client is not initialized",
+      };
+    }
+
+    if (activeTurn.interrupting) {
+      return {
+        ok: true,
+        status: "already-interrupting",
+        threadId: activeTurn.threadId,
+        turnId: activeTurn.turnId,
+      };
+    }
+
+    this.activeTurn = {
+      ...activeTurn,
+      interrupting: true,
+    };
+
+    try {
+      await client.interruptTurn({
+        threadId: activeTurn.threadId,
+        turnId: activeTurn.turnId,
+      });
+    } catch (error) {
+      if (this.activeTurn?.turnId === activeTurn.turnId) {
+        this.activeTurn = {
+          ...activeTurn,
+          interrupting: false,
+        };
+      }
+      throw error;
+    }
+
+    return {
+      ok: true,
+      status: "interrupt-requested",
+      threadId: activeTurn.threadId,
+      turnId: activeTurn.turnId,
+    };
   }
 
   /**
@@ -348,6 +455,7 @@ export class CodexWebSession {
     this.connection = null;
     this.started = false;
     this.threadId = null;
+    this.activeTurn = null;
   }
 
   /**

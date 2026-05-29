@@ -105,6 +105,21 @@ export type TurnStartResponse = JsonObjectLike & {
 };
 
 /**
+ * `turn/interrupt` request params の sample client 用 subset。
+ */
+export type TurnInterruptParams = JsonObjectLike & {
+  threadId: string;
+  turnId: string;
+};
+
+/**
+ * `turn/interrupt` response の sample client 用 subset。
+ *
+ * Codex App Server は成功時に空 object result を返す。
+ */
+export type TurnInterruptResponse = JsonObjectLike;
+
+/**
  * command execution approval request へ返せる decision。
  */
 export type CommandExecutionApprovalDecision =

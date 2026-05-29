@@ -67,6 +67,43 @@ function startServer(port: number) {
           // SSEは長時間無通信になる可能性があるため、request単位でidle timeoutを無効化する
           server.timeout(request, 0);
 
+          let interruptRequested = false;
+          let streamFinished = false;
+
+          const requestInterrupt = async (
+            source: "request-abort" | "stream-cancel",
+            reason?: unknown,
+          ): Promise<void> => {
+            if (interruptRequested || streamFinished) return;
+            interruptRequested = true;
+
+            try {
+              const result = await codexWebSession.interruptCurrentTurn();
+              if (!result.ok && result.status !== "no-active-turn") {
+                console.error("[codex interrupt failed]", {
+                  source,
+                  reason,
+                  status: result.status,
+                  message: result.message,
+                });
+              }
+            } catch (error) {
+              console.error("[codex interrupt request failed]", {
+                source,
+                reason,
+                error,
+              });
+            }
+          };
+
+          const requestAbortHandler = () => {
+            void requestInterrupt("request-abort");
+          };
+
+          request.signal.addEventListener("abort", requestAbortHandler, {
+            once: true,
+          });
+
           const stream = new ReadableStream<Uint8Array>({
             async start(controller) {
               const encoder = new TextEncoder();
@@ -82,6 +119,7 @@ function startServer(port: number) {
               try {
                 for await (const event of codexWebSession.runTurn(
                   message,
+                  { signal: request.signal },
                 )) {
                   controller.enqueue(
                     encoder.encode(sseEncode(event.type, event)),
@@ -95,18 +133,36 @@ function startServer(port: number) {
                   }
                 }
               } catch (error) {
-                controller.enqueue(
-                  encoder.encode(
-                    sseEncode("error", {
-                      type: "error",
-                      message:
-                        error instanceof Error ? error.message : String(error),
-                    }),
-                  ),
-                );
+                if (!interruptRequested) {
+                  controller.enqueue(
+                    encoder.encode(
+                      sseEncode("error", {
+                        type: "error",
+                        message:
+                          error instanceof Error
+                            ? error.message
+                            : String(error),
+                      }),
+                    ),
+                  );
+                }
               } finally {
-                controller.close();
+                streamFinished = true;
+                request.signal.removeEventListener(
+                  "abort",
+                  requestAbortHandler,
+                );
+                try {
+                  controller.close();
+                } catch (error) {
+                  if (!interruptRequested) {
+                    console.error("[codex sse close failed]", error);
+                  }
+                }
               }
+            },
+            async cancel(reason) {
+              await requestInterrupt("stream-cancel", reason);
             },
           });
 
@@ -117,6 +173,37 @@ function startServer(port: number) {
               connection: "keep-alive",
             },
           });
+        },
+      },
+
+      "/api/turns/current/interrupt": {
+        POST: async () => {
+          try {
+            const result = await codexWebSession.interruptCurrentTurn();
+
+            if (!result.ok) {
+              const status = result.status === "no-active-turn" ? 409 : 500;
+
+              return jsonResponse(
+                {
+                  ok: false,
+                  status: result.status,
+                  error: result.message,
+                },
+                { status },
+              );
+            }
+
+            return jsonResponse(result);
+          } catch (error) {
+            return jsonResponse(
+              {
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              { status: 500 },
+            );
+          }
         },
       },
 
