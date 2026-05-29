@@ -10,8 +10,16 @@ import type {
   InitializeCapabilities,
   InitializeParams,
   InitializeResponse,
+  ThreadListParams,
+  ThreadListResponse,
+  ThreadReadParams,
+  ThreadReadResponse,
+  ThreadResumeParams,
+  ThreadResumeResponse,
   ThreadStartParams,
   ThreadStartResponse,
+  ThreadTurnsListParams,
+  ThreadTurnsListResponse,
   TurnInterruptParams,
   TurnInterruptResponse,
   TurnStartParams,
@@ -120,6 +128,68 @@ export class CodexAppServerClient {
   async startThread(params: ThreadStartParams): Promise<ThreadStartResponse> {
     return this.connection.request<ThreadStartResponse>(
       "thread/start",
+      asJsonValue(params),
+    );
+  }
+
+  /**
+   * `thread/list` request を送る typed wrapper。
+   *
+   * @param params - thread 一覧のページングや絞り込み条件。
+   * @returns thread summary のページ。
+   * @throws JSON-RPC request が失敗した場合。
+   */
+  async listThreads(
+    params: ThreadListParams = {},
+  ): Promise<ThreadListResponse> {
+    return this.connection.request<ThreadListResponse>(
+      "thread/list",
+      asJsonValue(params),
+    );
+  }
+
+  /**
+   * `thread/read` request を送る typed wrapper。
+   *
+   * @param params - 読み取る thread ID と turns を含めるかどうか。
+   * @returns 保存済み thread の読み取り結果。
+   * @throws JSON-RPC request が失敗した場合。
+   */
+  async readThread(params: ThreadReadParams): Promise<ThreadReadResponse> {
+    return this.connection.request<ThreadReadResponse>(
+      "thread/read",
+      asJsonValue(params),
+    );
+  }
+
+  /**
+   * `thread/resume` request を送る typed wrapper。
+   *
+   * @param params - 再開する thread ID と runtime option。
+   * @returns resume 後の thread 情報。
+   * @throws JSON-RPC request が失敗した場合。
+   */
+  async resumeThread(
+    params: ThreadResumeParams,
+  ): Promise<ThreadResumeResponse> {
+    return this.connection.request<ThreadResumeResponse>(
+      "thread/resume",
+      asJsonValue(params),
+    );
+  }
+
+  /**
+   * `thread/turns/list` request を送る typed wrapper。
+   *
+   * @param params - turn 履歴の対象 thread ID とページング条件。
+   * @returns 保存済み turn 履歴のページ。
+   * @throws JSON-RPC request が失敗した場合。
+   */
+  async listThreadTurns(
+    params: ThreadTurnsListParams,
+  ): Promise<ThreadTurnsListResponse> {
+    return this.connection.request<ThreadTurnsListResponse>(
+      "thread/turns/list",
       asJsonValue(params),
     );
   }

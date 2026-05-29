@@ -81,6 +81,109 @@ export type ThreadStartResponse = JsonObjectLike & {
 };
 
 /**
+ * Codex thread の runtime status を UI へ渡すための sample client 用 subset。
+ */
+export type CodexThreadStatus = JsonObjectLike & {
+  type?: string;
+  activeFlags?: string[];
+};
+
+/**
+ * `thread/list` が返す thread summary の sample client 用 subset。
+ */
+export type CodexThreadSummary = JsonObjectLike & {
+  id: string;
+  name?: string | null;
+  preview?: string | null;
+  archived?: boolean | null;
+  ephemeral?: boolean | null;
+  modelProvider?: string | null;
+  createdAt?: number | string | null;
+  updatedAt?: number | string | null;
+  status?: JsonValue;
+};
+
+/**
+ * `thread/list` request params の sample client 用 subset。
+ */
+export type ThreadListParams = JsonObjectLike & {
+  cursor?: string | null;
+  limit?: number | null;
+  sortKey?: "created_at" | "updated_at" | null;
+  modelProviders?: string[] | null;
+  sourceKinds?: string[] | null;
+  archived?: boolean | null;
+  cwd?: string | null;
+  searchTerm?: string | null;
+};
+
+/**
+ * `thread/list` response の sample client 用 subset。
+ */
+export type ThreadListResponse = JsonObjectLike & {
+  data: JsonValue[];
+  nextCursor?: string | null;
+};
+
+/**
+ * `thread/read` request params の sample client 用 subset。
+ */
+export type ThreadReadParams = JsonObjectLike & {
+  threadId: string;
+  includeTurns?: boolean | null;
+};
+
+/**
+ * `thread/read` response の sample client 用 subset。
+ */
+export type ThreadReadResponse = JsonObjectLike & {
+  thread: JsonValue;
+};
+
+/**
+ * `thread/resume` request params の sample client 用 subset。
+ */
+export type ThreadResumeParams = JsonObjectLike & {
+  threadId: string;
+  model?: string | null;
+  modelProvider?: string | null;
+  serviceTier?: string | null;
+  cwd?: string | null;
+  approvalPolicy?: JsonValue;
+  sandbox?: JsonValue;
+  config?: Record<string, JsonValue> | null;
+  serviceName?: string | null;
+  baseInstructions?: string | null;
+  developerInstructions?: string | null;
+  personality?: JsonValue;
+};
+
+/**
+ * `thread/resume` response の sample client 用 subset。
+ */
+export type ThreadResumeResponse = ThreadStartResponse;
+
+/**
+ * `thread/turns/list` request params の sample client 用 subset。
+ */
+export type ThreadTurnsListParams = JsonObjectLike & {
+  threadId: string;
+  cursor?: string | null;
+  limit?: number | null;
+  sortDirection?: "asc" | "desc" | null;
+  itemsView?: "notLoaded" | "summary" | "full" | null;
+};
+
+/**
+ * `thread/turns/list` response の sample client 用 subset。
+ */
+export type ThreadTurnsListResponse = JsonObjectLike & {
+  data: JsonValue[];
+  nextCursor?: string | null;
+  backwardsCursor?: string | null;
+};
+
+/**
  * `turn/start` request params の sample client 用 subset。
  */
 export type TurnStartParams = JsonObjectLike & {

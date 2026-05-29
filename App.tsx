@@ -18,7 +18,7 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 const demoModel: ChatModelAdapter = {
   async *run({ messages, abortSignal }) {
@@ -37,7 +37,14 @@ const demoModel: ChatModelAdapter = {
   },
 };
 
-const codexModel: ChatModelAdapter = {
+type CreateCodexModelOptions = {
+  getCurrentThreadId: () => string | null;
+  setCurrentThreadId: (threadId: string) => void;
+};
+
+const createCodexModel = (
+  options: CreateCodexModelOptions,
+): ChatModelAdapter => ({
   async *run({ messages, abortSignal }) {
     const lastMessage = messages.at(-1);
     const textPart = lastMessage?.content.find((part) => part.type === "text");
@@ -65,7 +72,10 @@ const codexModel: ChatModelAdapter = {
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({
+          message: input,
+          threadId: options.getCurrentThreadId(),
+        }),
         signal: abortSignal,
       });
 
@@ -98,6 +108,9 @@ const codexModel: ChatModelAdapter = {
             buffer = parsed.buffer;
 
             for (const payload of parsed.events) {
+              if (payload.type === "turn.started" && payload.threadId) {
+                options.setCurrentThreadId(payload.threadId);
+              }
               state = applyCodexUiEvent(state, payload);
               yield toAssistantRunResult(state);
 
@@ -119,6 +132,9 @@ const codexModel: ChatModelAdapter = {
         buffer = parsed.buffer;
 
         for (const payload of parsed.events) {
+          if (payload.type === "turn.started" && payload.threadId) {
+            options.setCurrentThreadId(payload.threadId);
+          }
           state = applyCodexUiEvent(state, payload);
           yield toAssistantRunResult(state);
 
@@ -138,9 +154,25 @@ const codexModel: ChatModelAdapter = {
       abortSignal.removeEventListener("abort", onAbort);
     }
   },
-};
+});
 
 function ChatRoute() {
+  const [_currentThreadId, setCurrentThreadIdState] = useState<string | null>(
+    null,
+  );
+  const currentThreadIdRef = useRef<string | null>(null);
+  const setCurrentThreadId = useCallback((threadId: string) => {
+    currentThreadIdRef.current = threadId;
+    setCurrentThreadIdState(threadId);
+  }, []);
+  const codexModel = useMemo(
+    () =>
+      createCodexModel({
+        getCurrentThreadId: () => currentThreadIdRef.current,
+        setCurrentThreadId,
+      }),
+    [setCurrentThreadId],
+  );
   const runtime = useLocalRuntime(codexModel);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);

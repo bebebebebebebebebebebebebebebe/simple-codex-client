@@ -1,5 +1,6 @@
 import index from "./index.html";
 import { codexWebSession } from "./codex/codex-session";
+import type { ThreadResumeParams, ThreadStartParams } from "./codex/types";
 
 const requestedPort = Number(Bun.env.PORT ?? 3000);
 
@@ -25,6 +26,62 @@ function jsonResponse(data: unknown, init?: ResponseInit): Response {
   return Response.json(data, init);
 }
 
+const threadSwitchConflictMessage =
+  "cannot switch thread while a turn is active";
+
+const parsePositiveIntParam = (
+  searchParams: URLSearchParams,
+  name: string,
+  fallback: number,
+): number => {
+  const value = Number(searchParams.get(name) ?? fallback);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+
+const parseBooleanParam = (
+  searchParams: URLSearchParams,
+  name: string,
+): boolean | undefined => {
+  const value = searchParams.get(name);
+  if (value === null) return undefined;
+  return value === "true";
+};
+
+const parseEnumParam = <T extends string>(
+  searchParams: URLSearchParams,
+  name: string,
+  values: readonly T[],
+  fallback?: T,
+): T | undefined => {
+  const value = searchParams.get(name);
+  return values.includes(value as T) ? (value as T) : fallback;
+};
+
+const parseCsvParam = (
+  searchParams: URLSearchParams,
+  name: string,
+): string[] | undefined => {
+  const value = searchParams.get(name);
+  if (!value) return undefined;
+  const items = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return items.length > 0 ? items : undefined;
+};
+
+/**
+ * thread API の例外を HTTP response に変換する。
+ *
+ * @param error - route handler 内で発生した例外。
+ * @returns UI が扱える JSON error response。
+ */
+function threadApiErrorResponse(error: unknown): Response {
+  const message = error instanceof Error ? error.message : String(error);
+  const status = message === threadSwitchConflictMessage ? 409 : 500;
+  return jsonResponse({ ok: false, error: message }, { status });
+}
+
 /**
  * Web UI と Codex チャット API を提供する Bun サーバーを起動する。
  *
@@ -47,10 +104,166 @@ function startServer(port: number) {
         },
       },
 
+      "/api/threads": {
+        GET: async (request) => {
+          const url = new URL(request.url);
+          const sourceKinds =
+            parseCsvParam(url.searchParams, "sourceKinds") ?? ["appServer"];
+
+          try {
+            const result = await codexWebSession.listThreads({
+              cursor: url.searchParams.get("cursor"),
+              limit: parsePositiveIntParam(url.searchParams, "limit", 25),
+              archived: parseBooleanParam(url.searchParams, "archived"),
+              searchTerm: url.searchParams.get("searchTerm"),
+              cwd: url.searchParams.get("cwd"),
+              sortKey: parseEnumParam(url.searchParams, "sortKey", [
+                "created_at",
+                "updated_at",
+              ] as const),
+              sourceKinds,
+            });
+
+            return jsonResponse({
+              ok: true,
+              data: result.data,
+              nextCursor: result.nextCursor ?? null,
+              currentThreadId: codexWebSession.getCurrentThreadId(),
+            });
+          } catch (error) {
+            return threadApiErrorResponse(error);
+          }
+        },
+
+        POST: async (request) => {
+          const body = (await request.json().catch(() => null)) as Record<
+            string,
+            unknown
+          > | null;
+
+          try {
+            const result = await codexWebSession.startNewThread({
+              model: null,
+              ...((body ?? {}) as Partial<ThreadStartParams>),
+            });
+
+            return jsonResponse({
+              ok: true,
+              thread: result.thread,
+              currentThreadId: codexWebSession.getCurrentThreadId(),
+            });
+          } catch (error) {
+            return threadApiErrorResponse(error);
+          }
+        },
+      },
+
+      "/api/threads/:threadId/turns": {
+        GET: async (request) => {
+          const threadId = request.params.threadId?.trim();
+          if (!threadId) {
+            return jsonResponse(
+              { ok: false, error: "threadId is required" },
+              { status: 400 },
+            );
+          }
+
+          const url = new URL(request.url);
+
+          try {
+            const result = await codexWebSession.listThreadTurns(threadId, {
+              cursor: url.searchParams.get("cursor"),
+              limit: parsePositiveIntParam(url.searchParams, "limit", 50),
+              sortDirection: parseEnumParam(
+                url.searchParams,
+                "sortDirection",
+                ["asc", "desc"],
+                "desc",
+              ),
+              itemsView: parseEnumParam(
+                url.searchParams,
+                "itemsView",
+                ["notLoaded", "summary", "full"],
+                "summary",
+              ),
+            });
+
+            return jsonResponse({
+              ok: true,
+              data: result.data,
+              nextCursor: result.nextCursor ?? null,
+              backwardsCursor: result.backwardsCursor ?? null,
+            });
+          } catch (error) {
+            return threadApiErrorResponse(error);
+          }
+        },
+      },
+
+      "/api/threads/:threadId/resume": {
+        POST: async (request) => {
+          const threadId = request.params.threadId?.trim();
+          if (!threadId) {
+            return jsonResponse(
+              { ok: false, error: "threadId is required" },
+              { status: 400 },
+            );
+          }
+
+          const body = (await request.json().catch(() => null)) as Record<
+            string,
+            unknown
+          > | null;
+
+          try {
+            const result = await codexWebSession.resumeThread(
+              threadId,
+              (body ?? {}) as Omit<ThreadResumeParams, "threadId">,
+            );
+
+            return jsonResponse({
+              ok: true,
+              thread: result.thread,
+              currentThreadId: codexWebSession.getCurrentThreadId(),
+            });
+          } catch (error) {
+            return threadApiErrorResponse(error);
+          }
+        },
+      },
+
+      "/api/threads/:threadId": {
+        GET: async (request) => {
+          const threadId = request.params.threadId?.trim();
+          if (!threadId) {
+            return jsonResponse(
+              { ok: false, error: "threadId is required" },
+              { status: 400 },
+            );
+          }
+
+          const url = new URL(request.url);
+
+          try {
+            const result = await codexWebSession.readThread(threadId, {
+              includeTurns: url.searchParams.get("includeTurns") === "true",
+            });
+
+            return jsonResponse({
+              ok: true,
+              thread: result.thread,
+            });
+          } catch (error) {
+            return threadApiErrorResponse(error);
+          }
+        },
+      },
+
       "/api/chat": {
         POST: async (request, server) => {
           const body = (await request.json().catch(() => null)) as {
             message?: string;
+            threadId?: string | null;
           } | null;
 
           if (
@@ -66,6 +279,11 @@ function startServer(port: number) {
 
           // SSEは長時間無通信になる可能性があるため、request単位でidle timeoutを無効化する
           server.timeout(request, 0);
+
+          const requestedThreadId =
+            typeof body.threadId === "string" && body.threadId.trim()
+              ? body.threadId.trim()
+              : null;
 
           let interruptRequested = false;
           let streamFinished = false;
@@ -119,7 +337,7 @@ function startServer(port: number) {
               try {
                 for await (const event of codexWebSession.runTurn(
                   message,
-                  { signal: request.signal },
+                  { signal: request.signal, threadId: requestedThreadId },
                 )) {
                   controller.enqueue(
                     encoder.encode(sseEncode(event.type, event)),
