@@ -10,6 +10,13 @@
 - Use `bun install` instead of npm/yarn/pnpm installs.
 - Bun automatically loads `.env`; do not add `dotenv`.
 
+## Codebase Search and Inspection
+
+- When searching, exploring, or verifying code or files, always use Serena MCP first.
+- Prefer Serena MCP semantic tools such as `get_symbols_overview`, `find_symbol`, `find_referencing_symbols`, and `find_declaration` for codebase understanding.
+- Use shell/file tools such as `rg`, `grep`, `find`, `ls`, `cat`, or editor search only as a fallback when Serena MCP cannot inspect the target file type or required context.
+- If falling back from Serena MCP, briefly state why the fallback is necessary.
+
 ## Development Servers
 
 - If an AI agent starts a development server for verification or testing, it must stop that process after use.

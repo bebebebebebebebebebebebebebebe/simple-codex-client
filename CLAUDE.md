@@ -9,6 +9,13 @@ Default to using Bun instead of Node.js.
 - Use `bunx <package> <command>` instead of `npx <package> <command>`
 - Bun automatically loads .env, so don't use dotenv.
 
+## Codebase Search and Inspection
+
+- When searching, exploring, or verifying code or files, always use Serena MCP first.
+- Prefer Serena MCP semantic tools such as `get_symbols_overview`, `find_symbol`, `find_referencing_symbols`, and `find_declaration` for codebase understanding.
+- Use shell/file tools such as `rg`, `grep`, `find`, `ls`, `cat`, or editor search only as a fallback when Serena MCP cannot inspect the target file type or required context.
+- If falling back from Serena MCP, briefly state why the fallback is necessary.
+
 ## APIs
 
 - `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
